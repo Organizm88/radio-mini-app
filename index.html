@@ -3,233 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Радио Онлайн</title>
-    <style>
-        :root {
-            --primary-color: #2980b9;
-            --background-color: #1a2635;
-            --card-bg: #fff;
-            --text-color: #333;
-            --active-color: #3498db;
-        }
-        
-        body {
-            font-family: 'Roboto', Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--background-color);
-            color: var(--text-color);
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        h1 {
-            color: white;
-            margin-bottom: 30px;
-        }
-        
-        .search-container {
-            display: flex;
-            margin-bottom: 20px;
-        }
-        
-        #search-input {
-            flex: 1;
-            padding: 12px;
-            font-size: 16px;
-            border: none;
-            border-radius: 30px 0 0 30px;
-        }
-        
-        .search-button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 0 30px 30px 0;
-            padding: 0 20px;
-            cursor: pointer;
-        }
-        
-        .player-container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            position: relative;
-        }
-        
-        .player-icon {
-            color: var(--primary-color);
-            font-size: 32px;
-            margin-right: 15px;
-        }
-        
-        .player-controls {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 10px;
-        }
-        
-        .player-controls button {
-            background-color: #eaeaea;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 20px;
-        }
-        
-        .player-controls button:hover {
-            background-color: #d5d5d5;
-        }
-        
-        .favorite-button {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        
-        .categories-container {
-            margin-bottom: 20px;
-            overflow-x: auto;
-            white-space: nowrap;
-            scrollbar-width: none;
-            padding-bottom: 10px;
-        }
-        
-        .categories-container::-webkit-scrollbar {
-            display: none;
-        }
-        
-        #categories-tabs {
-            display: flex;
-        }
-        
-        .category-tab {
-            background-color: white;
-            padding: 10px 20px;
-            margin-right: 10px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-        
-        .category-tab.active {
-            background-color: var(--active-color);
-            color: white;
-        }
-        
-        .radio-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        
-        .radio-card {
-            background-color: var(--card-bg);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            position: relative;
-            transition: transform 0.2s;
-        }
-        
-        .radio-card.active {
-            border: 2px solid var(--active-color);
-            transform: scale(1.02);
-        }
-        
-        .radio-name {
-            margin: 0 0 10px 0;
-            font-weight: bold;
-        }
-        
-        .play-button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        
-        .favorite-button {
-            background: none;
-            border: none;
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            cursor: pointer;
-            font-size: 18px;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: var(--primary-color);
-            animation: spin 1s ease-in-out infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .utility-bar {
-            background-color: white;
-            padding: 10px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .timer-container {
-            display: flex;
-            align-items: center;
-        }
-        
-        .timer-container label {
-            margin-right: 10px;
-        }
-        
-        #sleep-timer {
-            width: 80px;
-            padding: 5px;
-        }
-        
-        #random-button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-    </style>
+    <title>Радио</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
 </head>
 <body>
     <div class="container">
@@ -237,47 +13,48 @@
             <h1>Радио Онлайн</h1>
             <div class="search-container">
                 <input type="text" id="search-input" placeholder="Поиск радиостанций...">
-                <button class="search-button">🔍</button>
+                <button id="search-button"><i class="fas fa-search"></i></button>
             </div>
         </header>
-        
+
         <div class="player-container">
-            <div class="player-icon">📻</div>
-            <div id="current-station">Сейчас играет: не выбрано</div>
-            <div id="loading" class="loading hidden"></div>
-            <div class="player-controls">
-                <button id="play-pause">⏸️</button>
-                <audio id="player" controls style="display: none;"></audio>
-                <button id="volume-down">🔉</button>
-                <button id="volume-up">🔊</button>
-                <button id="skip-forward">⏭️</button>
+            <div class="now-playing">
+                <div class="station-icon"><i class="fas fa-broadcast-tower"></i></div>
+                <div class="station-info">
+                    <p id="current-station">Выберите радиостанцию</p>
+                    <div id="animation-container">
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                    </div>
+                </div>
+                <div class="favorites-icon">
+                    <i id="favorite-button" class="far fa-heart"></i>
+                </div>
             </div>
+            <audio id="player" controls></audio>
         </div>
-        
-        <div class="utility-bar">
-            <div class="timer-container">
-                <label for="sleep-timer">Таймер сна (мин):</label>
-                <select id="sleep-timer">
-                    <option value="0">Выкл</option>
-                    <option value="15">15</option>
-                    <option value="30">30</option>
-                    <option value="45">45</option>
-                    <option value="60">60</option>
-                    <option value="90">90</option>
-                </select>
-            </div>
-            <button id="random-button">Случайная станция</button>
-        </div>
-        
+
         <div class="categories-container">
-            <div id="categories-tabs"></div>
+            <div class="categories-tabs" id="categories-tabs">
+                <!-- Категории будут добавлены с помощью JavaScript -->
+            </div>
         </div>
-        
-        <div id="radio-list" class="radio-list"></div>
+
+        <div class="radio-container">
+            <div id="radio-list" class="radio-list">
+                <!-- Радиостанции будут добавлены с помощью JavaScript -->
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+        </div>
     </div>
 
-    <script>
-        // Здесь вставить JavaScript код из первого артефакта
-    </script>
+    <script src="script.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </body>
 </html>

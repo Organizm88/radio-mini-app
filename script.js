@@ -38,6 +38,9 @@ document.addEventListener("DOMContentLoaded", () => {
     loadLastStation();
     createCategories();
     displayRadioStations(activeCategory);
+    
+    // Добавляем обработчик события для поиска
+    searchInput.addEventListener("input", handleSearch);
 });
 
 // Загрузка избранных станций
@@ -88,7 +91,7 @@ function createCategories() {
 }
 
 // Отображение радиостанций
-function displayRadioStations(category = "Все") {
+function displayRadioStations(category = "Все", searchTerm = "") {
     radioList.innerHTML = "";
     
     let stationsToDisplay = Object.entries(radioStations);
@@ -96,6 +99,13 @@ function displayRadioStations(category = "Все") {
         stationsToDisplay = stationsToDisplay.filter(([name]) => favorites.includes(name));
     } else if (category !== "Все") {
         stationsToDisplay = stationsToDisplay.filter(([_, station]) => station.category === category);
+    }
+    
+    // Фильтрация по поисковому запросу, если он есть
+    if (searchTerm) {
+        stationsToDisplay = stationsToDisplay.filter(([name]) => 
+            name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
     }
 
     if (stationsToDisplay.length === 0) {
@@ -120,10 +130,40 @@ function createRadioCard(name, station) {
     playButton.className = "play-button";
     playButton.textContent = "▶";
     playButton.addEventListener("click", () => playStation(name, station.url));
+    
+    // Добавляем кнопку "Избранное"
+    const favoriteButton = document.createElement("button");
+    favoriteButton.className = "favorite-button";
+    favoriteButton.textContent = favorites.includes(name) ? "❤️" : "🤍";
+    favoriteButton.addEventListener("click", () => toggleFavorite(name, favoriteButton));
 
     card.appendChild(stationName);
     card.appendChild(playButton);
+    card.appendChild(favoriteButton);
     radioList.appendChild(card);
+}
+
+// Добавление/удаление из избранного
+function toggleFavorite(name, button) {
+    const index = favorites.indexOf(name);
+    if (index === -1) {
+        favorites.push(name);
+        button.textContent = "❤️";
+    } else {
+        favorites.splice(index, 1);
+        button.textContent = "🤍";
+        // Если мы находимся в категории "Избранное", обновляем список
+        if (activeCategory === "Избранное") {
+            displayRadioStations(activeCategory);
+        }
+    }
+    saveFavorites();
+}
+
+// Обработчик поиска
+function handleSearch() {
+    const searchTerm = searchInput.value.trim();
+    displayRadioStations(activeCategory, searchTerm);
 }
 
 // Воспроизведение радиостанции с анимацией

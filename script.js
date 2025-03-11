@@ -1,7 +1,7 @@
 const radioStations = {
-    "Радио Рекорд": "http://air.radiorecord.ru:805/rr_320",
-    "Европа Плюс": "http://ep256.streamr.ru",
-    "DFM": "http://dfm128.streamr.ru"
+    "Радио Рекорд": "https://air2.radiorecord.ru:805/rr_320",
+    "Европа Плюс": "https://europaplus.hostingradio.ru:8014/europaplus320.mp3",
+    "DFM": "https://dfm.hostingradio.ru/dfm96.aacp"
 };
 const radioList = document.getElementById("radio-list");
 const player = document.getElementById("player");

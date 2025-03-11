@@ -5,13 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Радио</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <h1>Выбери радио</h1>
-        <div id="radio-list"></div>
-        <audio id="player" controls></audio>
+        <header>
+            <h1>Радио Онлайн</h1>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Поиск радиостанций...">
+                <button id="search-button"><i class="fas fa-search"></i></button>
+            </div>
+        </header>
+
+        <div class="player-container">
+            <div class="now-playing">
+                <div class="station-icon"><i class="fas fa-broadcast-tower"></i></div>
+                <div class="station-info">
+                    <p id="current-station">Выберите радиостанцию</p>
+                    <div id="animation-container">
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                        <div class="animation-bar"></div>
+                    </div>
+                </div>
+                <div class="favorites-icon">
+                    <i id="favorite-button" class="far fa-heart"></i>
+                </div>
+            </div>
+            <audio id="player" controls></audio>
+        </div>
+
+        <div class="categories-container">
+            <div class="categories-tabs" id="categories-tabs">
+                <!-- Категории будут добавлены с помощью JavaScript -->
+            </div>
+        </div>
+
+        <div class="radio-container">
+            <div id="radio-list" class="radio-list">
+                <!-- Радиостанции будут добавлены с помощью JavaScript -->
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+        </div>
     </div>
+
     <script src="script.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </body>

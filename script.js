@@ -1,19 +1,89 @@
 // Список радиостанций с категориями
 const radioStations = {
-    "Радио Рекорд": { url: "https://air2.radiorecord.ru:805/rr_320", category: "Танцевальная музыка" },
-    "Европа Плюс": { url: "https://europaplus.hostingradio.ru:8014/europaplus320.mp3", category: "Поп музыка" },
-    "DFM": { url: "https://dfm.hostingradio.ru/dfm96.aacp", category: "Танцевальная музыка" },
-    "Наше Радио": { url: "https://nashe1.hostingradio.ru/nashe-256", category: "Рок музыка" },
-    "Радио Energy": { url: "https://energyfm.hostingradio.ru/energyfm128.mp3", category: "Поп музыка" },
-    "Радио Maximum": { url: "https://maximum.hostingradio.ru/maximum128.mp3", category: "Рок музыка" },
-    "Ретро FM": { url: "https://emgregion.hostingradio.ru:8064/moscow.retro.mp3", category: "Шансон и Ретро" },
-    "Comedy Radio": { url: "https://pub0302.101.ru:8443/stream/air/aac/64/202", category: "Разговорные" },
-    "Business FM": { url: "https://bfm.hostingradio.ru:8004/fm", category: "Информационные" },
-    "Relax FM": { url: "https://pub0202.101.ru:8443/stream/air/aac/64/200", category: "Релакс" },
-    "ROCK FM": { url: "https://nashe1.hostingradio.ru/rock-128.mp3", category: "Рок музыка" },
-    "Маяк": { url: "https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps", category: "Разговорные" },
-    "Радио Культура": { url: "https://icecast-vgtrk.cdnvideo.ru/kulturafm_mp3_192kbps", category: "Разговорные" },
-    "Радио Зенит": { url: "https://stream.radiozenit.ru:8443/zenit", category: "Спорт" },
+    "Радио Рекорд": { 
+        url: "https://air2.radiorecord.ru:805/rr_320", 
+        category: "Танцевальная музыка",
+        icon: "fa-music",
+        bitrate: "320kbps"
+    },
+    "Европа Плюс": { 
+        url: "https://europaplus.hostingradio.ru:8014/europaplus320.mp3", 
+        category: "Поп музыка",
+        icon: "fa-music",
+        bitrate: "320kbps"
+    },
+    "DFM": { 
+        url: "https://dfm.hostingradio.ru/dfm96.aacp", 
+        category: "Танцевальная музыка",
+        icon: "fa-music",
+        bitrate: "96kbps"
+    },
+    "Наше Радио": { 
+        url: "https://nashe1.hostingradio.ru/nashe-256", 
+        category: "Рок музыка",
+        icon: "fa-guitar",
+        bitrate: "256kbps"
+    },
+    "Радио Energy": { 
+        url: "https://energyfm.hostingradio.ru/energyfm128.mp3", 
+        category: "Поп музыка",
+        icon: "fa-music",
+        bitrate: "128kbps"
+    },
+    "Радио Maximum": { 
+        url: "https://maximum.hostingradio.ru/maximum128.mp3", 
+        category: "Рок музыка",
+        icon: "fa-guitar",
+        bitrate: "128kbps"
+    },
+    "Ретро FM": { 
+        url: "https://emgregion.hostingradio.ru:8064/moscow.retro.mp3", 
+        category: "Шансон и Ретро",
+        icon: "fa-clock",
+        bitrate: "128kbps"
+    },
+    "Comedy Radio": { 
+        url: "https://pub0302.101.ru:8443/stream/air/aac/64/202", 
+        category: "Разговорные",
+        icon: "fa-microphone",
+        bitrate: "64kbps"
+    },
+    "Business FM": { 
+        url: "https://bfm.hostingradio.ru:8004/fm", 
+        category: "Информационные",
+        icon: "fa-newspaper",
+        bitrate: "128kbps"
+    },
+    "Relax FM": { 
+        url: "https://pub0202.101.ru:8443/stream/air/aac/64/200", 
+        category: "Релакс",
+        icon: "fa-spa",
+        bitrate: "64kbps"
+    },
+    "ROCK FM": { 
+        url: "https://nashe1.hostingradio.ru/rock-128.mp3", 
+        category: "Рок музыка",
+        icon: "fa-guitar",
+        bitrate: "128kbps"
+    },
+    "Маяк": { 
+        url: "https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps", 
+        category: "Разговорные",
+        icon: "fa-microphone",
+        bitrate: "128kbps"
+    },
+    "Радио Культура": { 
+        url: "https://icecast-vgtrk.cdnvideo.ru/kulturafm_mp3_192kbps", 
+        category: "Разговорные",
+        icon: "fa-microphone",
+        bitrate: "192kbps"
+    },
+    "Радио Зенит": { 
+        url: "https://stream.radiozenit.ru:8443/zenit", 
+        category: "Спорт",
+        icon: "fa-futbol",
+        bitrate: "128kbps"
+    }
 };
 
 // DOM-элементы
@@ -35,16 +105,31 @@ let activeCategory = "Все";
 let sleepTimeout = null;
 let lastVolume = 1;
 let isMuted = false;
+let retryCount = 0;
+const MAX_RETRIES = 3;
 
 // Инициализация приложения
 document.addEventListener("DOMContentLoaded", () => {
     loadFavorites();
     loadLastStation();
+    loadVolume();
     createCategories();
     displayRadioStations(activeCategory);
     setupKeyboardShortcuts();
     setupVolumeControl();
+    setupTelegramTheme();
 });
+
+// Настройка темы Telegram
+function setupTelegramTheme() {
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor);
+        document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor);
+        document.documentElement.style.setProperty('--tg-theme-button-color', tg.buttonColor);
+        document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.buttonTextColor);
+    }
+}
 
 // Загрузка избранных станций
 function loadFavorites() {
@@ -71,6 +156,21 @@ function saveLastStation() {
     localStorage.setItem("lastStation", currentStation);
 }
 
+// Загрузка громкости
+function loadVolume() {
+    const savedVolume = localStorage.getItem("lastVolume");
+    if (savedVolume) {
+        player.volume = parseFloat(savedVolume);
+        lastVolume = player.volume;
+        updateVolumeIcon(player.volume);
+    }
+}
+
+// Сохранение громкости
+function saveVolume() {
+    localStorage.setItem("lastVolume", player.volume);
+}
+
 // Создание категорий
 function createCategories() {
     const categories = new Set(Object.values(radioStations).map(station => station.category));
@@ -81,16 +181,43 @@ function createCategories() {
         const tab = document.createElement("div");
         tab.className = "category-tab";
         if (category === activeCategory) tab.classList.add("active");
-        tab.textContent = category;
+        
+        const icon = document.createElement("i");
+        icon.className = "fas " + getCategoryIcon(category);
+        
+        const text = document.createElement("span");
+        text.textContent = category;
+        
+        tab.appendChild(icon);
+        tab.appendChild(text);
         tab.setAttribute("data-category", category);
+        
         tab.addEventListener("click", () => {
             document.querySelectorAll(".category-tab").forEach(t => t.classList.remove("active"));
             tab.classList.add("active");
             activeCategory = category;
             displayRadioStations(category);
         });
+        
         categoriesTabs.appendChild(tab);
     });
+}
+
+// Получение иконки для категории
+function getCategoryIcon(category) {
+    const icons = {
+        "Все": "fa-globe",
+        "Избранное": "fa-heart",
+        "Танцевальная музыка": "fa-music",
+        "Поп музыка": "fa-music",
+        "Рок музыка": "fa-guitar",
+        "Шансон и Ретро": "fa-clock",
+        "Разговорные": "fa-microphone",
+        "Информационные": "fa-newspaper",
+        "Релакс": "fa-spa",
+        "Спорт": "fa-futbol"
+    };
+    return icons[category] || "fa-music";
 }
 
 // Отображение радиостанций
@@ -105,7 +232,12 @@ function displayRadioStations(category = "Все") {
     }
 
     if (stationsToDisplay.length === 0) {
-        radioList.innerHTML = "<p>Станции не найдены</p>";
+        radioList.innerHTML = `
+            <div class="no-results">
+                <i class="fas fa-search"></i>
+                <p>Станции не найдены</p>
+            </div>
+        `;
         return;
     }
 
@@ -127,15 +259,29 @@ function createRadioCard(name, station) {
 
     const stationDetails = document.createElement("p");
     stationDetails.className = "station-details";
-    stationDetails.textContent = `${station.category} • 128kbps`;
+    stationDetails.innerHTML = `
+        <i class="fas ${station.icon}"></i>
+        <span>${station.category}</span>
+        <i class="fas fa-circle"></i>
+        <span>${station.bitrate}</span>
+    `;
 
     const controls = document.createElement("div");
     controls.className = "station-controls";
 
     const playButton = document.createElement("button");
     playButton.className = "play-button";
-    playButton.innerHTML = '<i class="fas fa-play"></i>';
-    playButton.addEventListener("click", () => playStation(name, station.url));
+    playButton.innerHTML = name === currentStation ? 
+        '<i class="fas fa-pause"></i>' : 
+        '<i class="fas fa-play"></i>';
+    playButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (name === currentStation) {
+            togglePlayPause();
+        } else {
+            playStation(name, station.url);
+        }
+    });
 
     const favoriteButton = document.createElement("button");
     favoriteButton.className = "favorite-button";
@@ -154,6 +300,17 @@ function createRadioCard(name, station) {
     card.appendChild(stationInfo);
     card.appendChild(controls);
     radioList.appendChild(card);
+}
+
+// Переключение воспроизведения
+function togglePlayPause() {
+    if (player.paused) {
+        player.play();
+        document.querySelector(".play-button i").className = "fas fa-pause";
+    } else {
+        player.pause();
+        document.querySelector(".play-button i").className = "fas fa-play";
+    }
 }
 
 // Переключение избранного
@@ -176,15 +333,21 @@ function toggleFavorite(name, button) {
 function playStation(name, url) {
     loadingIndicator.classList.remove("hidden");
     player.src = url;
+    retryCount = 0;
     
     // Добавляем обработчик ошибок
     player.onerror = () => {
         loadingIndicator.classList.add("hidden");
-        alert("Ошибка воспроизведения станции. Попробуйте еще раз.");
-        setTimeout(() => {
-            player.src = url;
-            player.play();
-        }, 3000);
+        if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            showNotification(`Ошибка воспроизведения. Попытка ${retryCount} из ${MAX_RETRIES}...`);
+            setTimeout(() => {
+                player.src = url;
+                player.play();
+            }, 3000);
+        } else {
+            showNotification("Не удалось воспроизвести станцию. Попробуйте позже.", "error");
+        }
     };
 
     player.play().then(() => {
@@ -192,19 +355,21 @@ function playStation(name, url) {
         updateCurrentStationDisplay();
         saveLastStation();
         animationContainer.classList.add("active");
+        showNotification(`Сейчас играет: ${name}`);
 
         // Анимация смены станции
         document.querySelectorAll(".radio-card").forEach(card => card.classList.remove("active"));
         document.querySelectorAll(".radio-card").forEach(card => {
             if (card.querySelector(".radio-name").textContent === name) {
                 card.classList.add("active");
+                card.querySelector(".play-button i").className = "fas fa-pause";
             }
         });
 
         loadingIndicator.classList.add("hidden");
     }).catch(() => {
         loadingIndicator.classList.add("hidden");
-        alert("Ошибка воспроизведения станции");
+        showNotification("Ошибка воспроизведения станции", "error");
     });
 }
 
@@ -225,13 +390,6 @@ function setSleepTimer(minutes) {
     }
 }
 
-// Случайная станция
-function playRandomStation() {
-    const stations = Object.entries(radioStations);
-    const [randomName, randomStation] = stations[Math.floor(Math.random() * stations.length)];
-    playStation(randomName, randomStation.url);
-}
-
 // Настройка управления громкостью
 function setupVolumeControl() {
     const volumeSlider = document.createElement("input");
@@ -239,7 +397,7 @@ function setupVolumeControl() {
     volumeSlider.min = "0";
     volumeSlider.max = "1";
     volumeSlider.step = "0.1";
-    volumeSlider.value = "1";
+    volumeSlider.value = player.volume;
     volumeSlider.className = "volume-slider";
     
     const volumeContainer = document.createElement("div");
@@ -253,6 +411,7 @@ function setupVolumeControl() {
         player.volume = e.target.value;
         lastVolume = e.target.value;
         updateVolumeIcon(e.target.value);
+        saveVolume();
     });
 }
 
@@ -277,6 +436,7 @@ function toggleMute() {
         player.volume = lastVolume;
     }
     updateVolumeIcon(player.volume);
+    saveVolume();
 }
 
 // Настройка горячих клавиш
@@ -285,8 +445,7 @@ function setupKeyboardShortcuts() {
         switch(e.code) {
             case "Space":
                 e.preventDefault();
-                if (player.paused) player.play();
-                else player.pause();
+                if (currentStation) togglePlayPause();
                 break;
             case "ArrowRight":
                 playRandomStation();
@@ -294,10 +453,78 @@ function setupKeyboardShortcuts() {
             case "KeyM":
                 toggleMute();
                 break;
+            case "ArrowUp":
+                e.preventDefault();
+                player.volume = Math.min(1, player.volume + 0.1);
+                updateVolumeIcon(player.volume);
+                saveVolume();
+                break;
+            case "ArrowDown":
+                e.preventDefault();
+                player.volume = Math.max(0, player.volume - 0.1);
+                updateVolumeIcon(player.volume);
+                saveVolume();
+                break;
         }
     });
 }
 
-// Обработчики событий
-randomButton.addEventListener("click", playRandomStation);
-sleepTimerInput.addEventListener("change", () => setSleepTimer(parseInt(sleepTimerInput.value)));
+// Показ уведомлений
+function showNotification(message, type = "success") {
+    const notification = document.createElement("div");
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas ${type === "success" ? "fa-check-circle" : "fa-exclamation-circle"}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add("show");
+    }, 100);
+    
+    setTimeout(() => {
+        notification.classList.remove("show");
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 3000);
+}
+
+// Случайная станция
+function playRandomStation() {
+    const stations = Object.entries(radioStations);
+    const [randomName, randomStation] = stations[Math.floor(Math.random() * stations.length)];
+    playStation(randomName, randomStation.url);
+}
+
+// Поиск станций
+searchInput.addEventListener("input", (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    const stations = Object.entries(radioStations);
+    
+    const filteredStations = stations.filter(([name, station]) => 
+        name.toLowerCase().includes(searchTerm) || 
+        station.category.toLowerCase().includes(searchTerm)
+    );
+    
+    displayFilteredStations(filteredStations);
+});
+
+// Отображение отфильтрованных станций
+function displayFilteredStations(stations) {
+    radioList.innerHTML = "";
+    
+    if (stations.length === 0) {
+        radioList.innerHTML = `
+            <div class="no-results">
+                <i class="fas fa-search"></i>
+                <p>Станции не найдены</p>
+            </div>
+        `;
+        return;
+    }
+    
+    stations.forEach(([name, station]) => createRadioCard(name, station));
+}

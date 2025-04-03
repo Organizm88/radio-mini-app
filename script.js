@@ -1,1845 +1,674 @@
-// Список радиостанций с категориями
+// Основные переменные
+let currentStation = null;
+let tg = window.Telegram.WebApp;
+
+// Кэшируем элементы DOM
+const elements = {
+    player: document.getElementById('player'),
+    radioList: document.getElementById('radio-list'),
+    currentStationEl: document.getElementById('current-station'),
+    loadingIndicator: document.getElementById('loading')
+};
+
+// Список радиостанций
 const radioStations = {
     // Поп-музыка (Pop)
-    "Европа Плюс": { 
-        url: "http://europaplus.hostingradio.ru:8014/europaplus320.mp3", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "320kbps"
+    "Европа Плюс": {
+        url: "http://europaplus.hostingradio.ru:8014/europaplus320.mp3",
+        category: "Поп-музыка",
+        bitrate: "320 kbps"
     },
-    "Русское Радио": { 
-        url: "https://rusradio.hostingradio.ru/rusradio96.aacp", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "96kbps"
+    "Русское Радио": {
+        url: "https://rusradio.hostingradio.ru/rusradio96.aacp",
+        category: "Поп-музыка",
+        bitrate: "96 kbps"
     },
-    "Новое Радио": { 
-        url: "https://icecast-newradio.cdnvideo.ru/newradio3", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Новое Радио": {
+        url: "https://icecast-newradio.cdnvideo.ru/newradio3",
+        category: "Поп-музыка",
+        bitrate: "128 kbps"
     },
-    "Love Radio": { 
-        url: "http://stream.loveradio.ru/12_love_28?type=.aac", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Love Radio": {
+        url: "http://stream.loveradio.ru/12_love_28?type=.aac",
+        category: "Поп-музыка",
+        bitrate: "128 kbps"
     },
-    "Хит FM": { 
-        url: "http://hitfm.hostingradio.ru/hitfm128.mp3", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Хит FM": {
+        url: "http://hitfm.hostingradio.ru/hitfm128.mp3",
+        category: "Поп-музыка",
+        bitrate: "128 kbps"
     },
-    "DFM": { 
-        url: "https://dfm.hostingradio.ru/dfm96.aacp", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "96kbps"
+    "DFM": {
+        url: "https://dfm.hostingradio.ru/dfm96.aacp",
+        category: "Поп-музыка",
+        bitrate: "96 kbps"
     },
-    "Радио ENERGY": { 
-        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/99", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "256kbps"
+    "Радио ENERGY": {
+        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/99",
+        category: "Поп-музыка",
+        bitrate: "256 kbps"
     },
-    "Зайцев FM Pop": { 
-        url: "https://zaycev.fm:9002/pop128.mp3", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Зайцев FM Pop": {
+        url: "https://zaycev.fm:9002/pop128.mp3",
+        category: "Поп-музыка",
+        bitrate: "128 kbps"
     },
-    "Радио Maximum": { 
-        url: "https://maximum.hostingradio.ru/maximum128.mp3", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Радио Maximum": {
+        url: "https://maximum.hostingradio.ru/maximum128.mp3",
+        category: "Поп-музыка",
+        bitrate: "128 kbps"
     },
-    "Радио Monte Carlo": { 
-        url: "https://montecarlo.hostingradio.ru/montecarlo128.mp3", 
-        category: "Поп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Радио Monte Carlo": {
+        url: "https://montecarlo.hostingradio.ru/montecarlo128.mp3",
+        category: "Поп-музыка",
+        bitrate: "128 kbps"
     },
 
     // Танцевальная музыка (Dance/Electronic)
-    "Радио Рекорд": { 
-        url: "https://air.radiorecord.ru:805/rr_320", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "320kbps"
+    "Радио Рекорд": {
+        url: "https://air.radiorecord.ru:805/rr_320",
+        category: "Танцевальная",
+        bitrate: "320 kbps"
     },
-    "DFM Dance": { 
-        url: "https://dfm-dance.hostingradio.ru/dance96.aacp", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "96kbps"
+    "DFM Dance": {
+        url: "https://dfm-dance.hostingradio.ru/dance96.aacp",
+        category: "Танцевальная",
+        bitrate: "96 kbps"
     },
-    "Record Deep": { 
-        url: "https://air.radiorecord.ru:805/deep_320", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "320kbps"
+    "Record Deep": {
+        url: "https://air.radiorecord.ru:805/deep_320",
+        category: "Танцевальная",
+        bitrate: "320 kbps"
     },
-    "Record Trance": { 
-        url: "https://air.radiorecord.ru:805/trance_320", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "320kbps"
+    "Record Trance": {
+        url: "https://air.radiorecord.ru:805/trance_320",
+        category: "Танцевальная",
+        bitrate: "320 kbps"
     },
-    "Garage FM": { 
-        url: "https://garagefm.ru:8000/garagefm", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Garage FM": {
+        url: "https://garagefm.ru:8000/garagefm",
+        category: "Танцевальная",
+        bitrate: "128 kbps"
     },
-    "Revolution Radio": { 
-        url: "https://revolutionradio.ru:8000/live", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Revolution Radio": {
+        url: "https://revolutionradio.ru:8000/live",
+        category: "Танцевальная",
+        bitrate: "128 kbps"
     },
-    "Q-Dance": { 
-        url: "https://stream.q-dance.com/hardstyle", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Q-Dance": {
+        url: "https://stream.q-dance.com/hardstyle",
+        category: "Танцевальная",
+        bitrate: "128 kbps"
     },
-    "Record Goa/Psy Trance": { 
-        url: "https://air.radiorecord.ru:805/goa_320", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "320kbps"
+    "Record Goa/Psy Trance": {
+        url: "https://air.radiorecord.ru:805/goa_320",
+        category: "Танцевальная",
+        bitrate: "320 kbps"
     },
-    "Soundpark Deep": { 
-        url: "https://soundpark.hostingradio.ru/soundpark128.mp3", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Soundpark Deep": {
+        url: "https://soundpark.hostingradio.ru/soundpark128.mp3",
+        category: "Танцевальная",
+        bitrate: "128 kbps"
     },
-    "Pirate Station": { 
-        url: "https://air.radiorecord.ru:805/ps_320", 
-        category: "Танцевальные",
-        icon: "fa-music",
-        bitrate: "320kbps"
+    "Pirate Station": {
+        url: "https://air.radiorecord.ru:805/ps_320",
+        category: "Танцевальная",
+        bitrate: "320 kbps"
     },
 
     // Рок (Rock)
-    "Наше Радио": { 
-        url: "https://nashe1.hostingradio.ru/nashe-256", 
+    "Наше Радио": {
+        url: "https://nashe1.hostingradio.ru/nashe-256",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "256kbps"
+        bitrate: "256 kbps"
     },
-    "Rock FM": { 
-        url: "https://rockfm.hostingradio.ru/rockfm128.mp3", 
+    "Rock FM": {
+        url: "https://rockfm.hostingradio.ru/rockfm128.mp3",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Легенды Рока": { 
-        url: "https://rocklegends.ru:8000/rock", 
+    "Радио Maximum Rock": {
+        url: "https://maximum.hostingradio.ru/maximum128.mp3",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "DKFM Shoegaze Radio": { 
-        url: "https://stream.dkfm.rocks:8000/shoegaze", 
+    "Легенды Рока": {
+        url: "https://rocklegends.ru:8000/rock",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Radio ROKS": { 
-        url: "https://online-radio.roks.ua/RadioROKS_320", 
+    "DKFM Shoegaze Radio": {
+        url: "https://stream.dkfm.rocks:8000/shoegaze",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "320kbps"
+        bitrate: "128 kbps"
     },
-    "KXRY (XRAY.fm)": { 
-        url: "https://stream.xray.fm/stream", 
+    "Radio ROKS": {
+        url: "https://online-radio.roks.ua/RadioROKS_320",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "128kbps"
+        bitrate: "320 kbps"
     },
-    "NTS Radio Rock": { 
-        url: "https://stream-1a.ntslive.net/stream", 
+    "KXRY": {
+        url: "https://stream.xray.fm/stream",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Ария FM": { 
-        url: "https://ariafm.ru:8000/aria", 
+    "NTS Radio Rock": {
+        url: "https://stream-1a.ntslive.net/stream",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "New New World Radio": { 
-        url: "https://nnwradio.com:8000/stream", 
+    "Ария FM": {
+        url: "https://ariafm.ru:8000/aria",
         category: "Рок",
-        icon: "fa-guitar",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
+    },
+    "New New World Radio": {
+        url: "https://nnwradio.com:8000/stream",
+        category: "Рок",
+        bitrate: "128 kbps"
     },
 
     // Ретро (Retro)
-    "Ретро FM": { 
-        url: "https://retro.hostingradio.ru:8014/retro320.mp3", 
+    "Ретро FM": {
+        url: "https://retro.hostingradio.ru:8014/retro320.mp3",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "320kbps"
+        bitrate: "320 kbps"
     },
-    "Радио Дача": { 
-        url: "https://radiodacha.hostingradio.ru/radiodacha128.mp3", 
+    "Радио Дача": {
+        url: "https://radiodacha.hostingradio.ru/radiodacha128.mp3",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Авторадио": { 
-        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/100", 
+    "Авторадио": {
+        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/100",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "256kbps"
+        bitrate: "256 kbps"
     },
-    "Радио 7": { 
-        url: "https://radio7.hostingradio.ru/radio7128.mp3", 
+    "Радио 7": {
+        url: "https://radio7.hostingradio.ru/radio7128.mp3",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Monte Carlo Nights": { 
-        url: "https://montecarlo.hostingradio.ru/nights128.mp3", 
+    "Monte Carlo Nights": {
+        url: "https://montecarlo.hostingradio.ru/nights128.mp3",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Золотые Хиты": { 
-        url: "https://goldenhits.ru:8000/stream", 
+    "Золотые Хиты": {
+        url: "https://goldenhits.ru:8000/stream",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Шторм": { 
-        url: "https://shtorm.fm:8000/radio", 
+    "Радио Шторм": {
+        url: "https://shtorm.fm:8000/radio",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "MJoy Greatest Songs": { 
-        url: "https://mjoy.ua:8000/greatest", 
+    "MJoy Greatest Songs": {
+        url: "https://mjoy.ua:8000/greatest",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Сектор": { 
-        url: "https://sectorradio.ru:8000/stream", 
+    "Радио Сектор": {
+        url: "https://sectorradio.ru:8000/stream",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Relax FM Retro": { 
-        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/200", 
+    "Relax FM Retro": {
+        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/200",
         category: "Ретро",
-        icon: "fa-clock",
-        bitrate: "256kbps"
+        bitrate: "256 kbps"
     },
 
     // Джаз, Блюз, Соул (Jazz/Blues/Soul)
-    "Радио Jazz": { 
-        url: "https://radiojazz.hostingradio.ru/radiojazz128.mp3", 
+    "Радио Jazz": {
+        url: "https://radiojazz.hostingradio.ru/radiojazz128.mp3",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Jazz FM": { 
-        url: "https://listen.jazzfm.com/jazzfm", 
+    "Jazz FM": {
+        url: "https://listen.jazzfm.com/jazzfm",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "SomaFM Blues": { 
-        url: "https://somafm.com/blues.pls", 
+    "SomaFM Blues": {
+        url: "https://somafm.com/blues.pls",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "FIP Jazz": { 
-        url: "https://stream.radiofrance.fr/fipjazz/fipjazz.m3u8", 
+    "FIP Jazz": {
+        url: "https://stream.radiofrance.fr/fipjazz/fipjazz.m3u8",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Соул": { 
-        url: "https://soulradio.ru:8000/stream", 
+    "Радио Соул": {
+        url: "https://soulradio.ru:8000/stream",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Smooth Jazz": { 
-        url: "https://smoothjazz.com:8000/stream", 
+    "Smooth Jazz": {
+        url: "https://smoothjazz.com:8000/stream",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Blues Radio": { 
-        url: "https://bluesradio.gr:8000/stream", 
+    "Blues Radio": {
+        url: "https://bluesradio.gr:8000/stream",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "TSF Jazz": { 
-        url: "https://tsfjazz.ice.infomaniak.ch/tsfjazz-high.mp3", 
+    "TSF Jazz": {
+        url: "https://tsfjazz.ice.infomaniak.ch/tsfjazz-high.mp3",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "256 kbps"
     },
-    "Jazz24": { 
-        url: "https://live.wastreaming.net/jazz24-128mp3", 
+    "Jazz24": {
+        url: "https://live.wastreaming.net/jazz24-128mp3",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Soul Cafe Radio": { 
-        url: "https://soulcaferadio.com:8000/stream", 
+    "Soul Cafe Radio": {
+        url: "https://soulcaferadio.com:8000/stream",
         category: "Джаз",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
 
     // Релакс и Легкая музыка (Relax/Chill)
-    "Relax FM": { 
-        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/200", 
+    "Relax FM": {
+        url: "https://pub0301.101.ru:8443/stream/air/mp3/256/200",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "256kbps"
+        bitrate: "256 kbps"
     },
-    "Lounge FM Chill-Out": { 
-        url: "https://loungefm.com.ua:8000/chill", 
+    "Lounge FM Chill-Out": {
+        url: "https://loungefm.com.ua:8000/chill",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Enigmatic Immersion": { 
-        url: "https://enigmatic.ru:8000/stream", 
+    "Enigmatic Immersion": {
+        url: "https://enigmatic.ru:8000/stream",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Атмосфера": { 
-        url: "https://atmosfera.fm:8000/stream", 
+    "Радио Атмосфера": {
+        url: "https://atmosfera.fm:8000/stream",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Chillout Zone": { 
-        url: "https://chillout.zone:8000/stream", 
+    "Chillout Zone": {
+        url: "https://chillout.zone:8000/stream",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "SomaFM Groove Salad": { 
-        url: "https://somafm.com/groovesalad.pls", 
+    "SomaFM Groove Salad": {
+        url: "https://somafm.com/groovesalad.pls",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Yoga Radio": { 
-        url: "https://yogaradio.ru:8000/stream", 
+    "Yoga Radio": {
+        url: "https://yogaradio.ru:8000/stream",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Spa Radio": { 
-        url: "https://sparadio.ru:8000/stream", 
+    "Spa Radio": {
+        url: "https://sparadio.ru:8000/stream",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Ambient Sleeping Pill": { 
-        url: "https://ambientsleepingpill.com/stream.pls", 
+    "Ambient Sleeping Pill": {
+        url: "https://ambientsleepingpill.com/stream.pls",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Оазис": { 
-        url: "https://oasisradio.ru:8000/stream", 
+    "Радио Оазис": {
+        url: "https://oasisradio.ru:8000/stream",
         category: "Релакс",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
+    },
+
+    // Классика
+    "Радио Орфей": {
+        url: "https://orfey.hostingradio.ru/orfey128.mp3",
+        category: "Классика",
+        bitrate: "128 kbps"
+    },
+    "Classical FM": {
+        url: "https://classicalfm.co.uk:8000/stream",
+        category: "Классика",
+        bitrate: "128 kbps"
+    },
+    "Радио Культура": {
+        url: "https://kultura.hostingradio.ru/kultura128.mp3",
+        category: "Классика",
+        bitrate: "128 kbps"
+    },
+
+    // Шансон
+    "Радио Шансон": {
+        url: "https://chanson.hostingradio.ru:8041/chanson256.mp3",
+        category: "Шансон",
+        bitrate: "256 kbps"
+    },
+    "Калина Красная": {
+        url: "https://kalina.hostingradio.ru/kalina128.mp3",
+        category: "Шансон",
+        bitrate: "128 kbps"
+    },
+    "Радио Родных Дорог": {
+        url: "https://rodnyedorogi.ru:8000/stream",
+        category: "Шансон",
+        bitrate: "128 kbps"
     },
 
     // Хип-хоп, Рэп, R&B (Hip-Hop/Rap/R&B)
-    "Зайцев FM RNB": { 
-        url: "https://zaycev.fm:9002/rnb128.mp3", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Зайцев FM RNB": {
+        url: "https://zaycev.fm:9002/rnb128.mp3",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "Rap FM": { 
-        url: "https://rapfm.ru:8000/stream", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Rap FM": {
+        url: "https://rapfm.ru:8000/stream",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "Hot 108 Jamz": { 
-        url: "https://stream.hot108.com:8000/hot108", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Hot 108 Jamz": {
+        url: "https://stream.hot108.com:8000/hot108",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "Power 106": { 
-        url: "https://live.power106.com/power106", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Power 106": {
+        url: "https://live.power106.com/power106",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "SomaFM Underground 80s": { 
-        url: "https://somafm.com/u80s.pls", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "SomaFM Underground 80s": {
+        url: "https://somafm.com/u80s.pls",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "Streetz Radio": { 
-        url: "https://streetzradio.com:8000/stream", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Streetz Radio": {
+        url: "https://streetzradio.com:8000/stream",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "RNB Hits": { 
-        url: "https://rnbradio.com:8000/stream", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "RNB Hits": {
+        url: "https://rnbradio.com:8000/stream",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "Hip Hop Nation": { 
-        url: "https://hiphopnation.com:8000/stream", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Hip Hop Nation": {
+        url: "https://hiphopnation.com:8000/stream",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "Boom Bap Radio": { 
-        url: "https://boombapradio.com:8000/stream", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Boom Bap Radio": {
+        url: "https://boombapradio.com:8000/stream",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
-    "Urban FM": { 
-        url: "https://urbanfm.ru:8000/stream", 
-        category: "Хип-Хоп",
-        icon: "fa-music",
-        bitrate: "128kbps"
+    "Urban FM": {
+        url: "https://urbanfm.ru:8000/stream",
+        category: "Хип-хоп",
+        bitrate: "128 kbps"
     },
 
     // Классическая музыка (Classical)
-    "Радио Орфей": { 
-        url: "https://orfey.hostingradio.ru/orfey128.mp3", 
+    "Радио Орфей": {
+        url: "https://orfey.hostingradio.ru/orfey128.mp3",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Classical FM": { 
-        url: "https://classicalfm.co.uk:8000/stream", 
+    "Classical FM": {
+        url: "https://classicalfm.co.uk:8000/stream",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "BBC Radio 3": { 
-        url: "https://stream.live.bbc.co.uk/bbc_radio_three", 
+    "BBC Radio 3": {
+        url: "https://stream.live.bbc.co.uk/bbc_radio_three",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Культура": { 
-        url: "https://kultura.hostingradio.ru/kultura128.mp3", 
+    "Радио Культура": {
+        url: "https://kultura.hostingradio.ru/kultura128.mp3",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Classic FM": { 
-        url: "https://classicfm.co.uk:8000/stream", 
+    "Classic FM": {
+        url: "https://classicfm.co.uk:8000/stream",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Venice Classic Radio": { 
-        url: "https://veniceclassicradio.eu:8000/stream", 
+    "Venice Classic Radio": {
+        url: "https://veniceclassicradio.eu:8000/stream",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Symphony Radio": { 
-        url: "https://symphonyradio.com:8000/stream", 
+    "Symphony Radio": {
+        url: "https://symphonyradio.com:8000/stream",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Baroque Radio": { 
-        url: "https://baroqueradio.com:8000/stream", 
+    "Baroque Radio": {
+        url: "https://baroqueradio.com:8000/stream",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Classical WETA": { 
-        url: "https://weta.org:8000/classical", 
+    "Classical WETA": {
+        url: "https://weta.org:8000/classical",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Шедевр": { 
-        url: "https://shedevr.fm:8000/stream", 
+    "Радио Шедевр": {
+        url: "https://shedevr.fm:8000/stream",
         category: "Классика",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
 
     // Разговорные и Новости (Talk/News)
-    "Радио Sputnik": { 
-        url: "https://sputnik.hostingradio.ru/sputnik128.mp3", 
+    "Радио Sputnik": {
+        url: "https://sputnik.hostingradio.ru/sputnik128.mp3",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Вести FM": { 
-        url: "https://vesti.hostingradio.ru/vesti128.mp3", 
+    "Вести FM": {
+        url: "https://vesti.hostingradio.ru/vesti128.mp3",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Эхо Москвы": { 
-        url: "https://echo.msk.ru:8000/stream", 
+    "Радио КП": {
+        url: "https://radiokp.hostingradio.ru/radiokp128.mp3",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио КП": { 
-        url: "https://radiokp.hostingradio.ru/radiokp128.mp3", 
+    "Business FM": {
+        url: "https://bfm.hostingradio.ru/bfm128.mp3",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Business FM": { 
-        url: "https://bfm.hostingradio.ru/bfm128.mp3", 
+    "Радио Маяк": {
+        url: "https://mayak.hostingradio.ru/mayak128.mp3",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Маяк": { 
-        url: "https://mayak.hostingradio.ru/mayak128.mp3", 
+    "Соловьёв Лайф ФМ": {
+        url: "https://soloviev.live:8000/stream",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Соловьёв Лайф ФМ": { 
-        url: "https://soloviev.live:8000/stream", 
+    "Радио Патриот": {
+        url: "https://patriot.fm:8000/stream",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Патриот": { 
-        url: "https://patriot.fm:8000/stream", 
+    "BBC World Service": {
+        url: "https://stream.live.bbc.co.uk/bbc_world_service",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "BBC World Service": { 
-        url: "https://stream.live.bbc.co.uk/bbc_world_service", 
+    "NPR Radio": {
+        url: "https://npr.org:8000/stream",
         category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
-    },
-    "NPR Radio": { 
-        url: "https://npr.org:8000/stream", 
-        category: "Новости",
-        icon: "fa-newspaper",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
 
     // Шансон и Народная музыка (Chanson/Folk)
-    "Радио Шансон": { 
-        url: "https://chanson.hostingradio.ru:8041/chanson256.mp3", 
+    "Радио Шансон": {
+        url: "https://chanson.hostingradio.ru:8041/chanson256.mp3",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "256kbps"
+        bitrate: "256 kbps"
     },
-    "Калина Красная": { 
-        url: "https://kalina.hostingradio.ru/kalina128.mp3", 
+    "Калина Красная": {
+        url: "https://kalina.hostingradio.ru/kalina128.mp3",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Родных Дорог": { 
-        url: "https://rodnyedorogi.ru:8000/stream", 
+    "Радио Родных Дорог": {
+        url: "https://rodnyedorogi.ru:8000/stream",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Русский Шансон": { 
-        url: "https://russianshanson.ru:8000/stream", 
+    "Русский Шансон": {
+        url: "https://russianshanson.ru:8000/stream",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Folk Radio": { 
-        url: "https://folkradio.co.uk:8000/stream", 
+    "Folk Radio": {
+        url: "https://folkradio.co.uk:8000/stream",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Шансон 24": { 
-        url: "https://shanson24.ru:8000/stream", 
+    "Шансон 24": {
+        url: "https://shanson24.ru:8000/stream",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Вера": { 
-        url: "https://radiovera.hostingradio.ru/radiovera128.mp3", 
+    "Радио Вера": {
+        url: "https://radiovera.hostingradio.ru/radiovera128.mp3",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Блатняк FM": { 
-        url: "https://blatnyak.fm:8000/stream", 
+    "Блатняк FM": {
+        url: "https://blatnyak.fm:8000/stream",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "FIP Ethnic": { 
-        url: "https://stream.radiofrance.fr/fipethnic/fipethnic.m3u8", 
+    "FIP Ethnic": {
+        url: "https://stream.radiofrance.fr/fipethnic/fipethnic.m3u8",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     },
-    "Радио Станица": { 
-        url: "https://stanitsa.fm:8000/stream", 
+    "Радио Станица": {
+        url: "https://stanitsa.fm:8000/stream",
         category: "Шансон",
-        icon: "fa-music",
-        bitrate: "128kbps"
+        bitrate: "128 kbps"
     }
 };
 
-// Кэширование DOM элементов
-const elements = {
-    sidebar: document.querySelector('.sidebar'),
-    mainContent: document.querySelector('.main-content'),
-    radioList: document.getElementById('radio-list'),
-    playerBar: document.querySelector('.player-bar'),
-    player: document.getElementById('player'),
-    searchInput: document.getElementById('search-input'),
-    filterButton: document.getElementById('filter-button'),
-    filtersPanel: document.getElementById('filters-panel'),
-    viewControls: document.querySelector('.view-controls'),
-    volumeControl: document.querySelector('.volume-control'),
-    volumeSlider: document.getElementById('volume-slider'),
-    currentStationEl: document.getElementById('current-station'),
-    loadingIndicator: document.getElementById('loading'),
-    modalCloseButtons: document.querySelectorAll('.modal-close'),
-    sleepTimerModal: document.getElementById('sleep-timer-modal'),
-    timerOptions: document.querySelector('.timer-options')
-};
-
-// Переменные состояния
-let currentStation = "";
-let favorites = [];
-let activeCategory = "Все";
-let retryCount = 0;
-const MAX_RETRIES = 3;
-
-// ASCII-арт котик
-const catFrames = [
-    `
-  /\\___/\\
- (  o o  )
- (  T  )
-  | | |
-    `,
-    `
-  /\\___/\\
- (  - -  )
- (  T  )
-  | | |
-    `,
-    `
-  /\\___/\\
- (  o o  )
- (  T  )
-  | | |
-    `
-];
+// Инициализация приложения
+document.addEventListener('DOMContentLoaded', () => {
+    initTelegramWebApp();
+    displayRadioStations();
+    setupEventListeners();
+});
 
 // Инициализация Telegram WebApp
 function initTelegramWebApp() {
-    try {
-        // Проверяем доступность Telegram WebApp
-        if (!window.Telegram || !window.Telegram.WebApp) {
-            console.warn('Telegram WebApp не доступен');
-            showNotification('Приложение запущено вне Telegram', 'warning');
-            return false;
-        }
-
+    if (window.Telegram && window.Telegram.WebApp) {
         tg = window.Telegram.WebApp;
-        
-        // Проверяем инициализацию
-        if (!tg.initData || !tg.initDataUnsafe) {
-            throw new Error('Ошибка инициализации данных Telegram');
-        }
-
-        // Расширяем приложение на весь экран
         tg.expand();
-        
-        // Получаем данные пользователя
-        const user = tg.initDataUnsafe.user;
-        if (user) {
-            console.log('Telegram user:', user);
-        }
-        
-        // Настраиваем тему
-        setupTelegramTheme();
-        
-        // Добавляем кнопку "Поделиться"
-        setupShareButton();
-        
-        // Добавляем кнопку "Назад"
-        setupBackButton();
-
-        return true;
-    } catch (error) {
-        console.error('Ошибка инициализации Telegram WebApp:', error);
-        showNotification('Ошибка инициализации Telegram. Некоторые функции могут быть недоступны.', 'error');
-        return false;
     }
 }
 
-// Функция для отправки данных в Telegram
-function sendDataToTelegram(data) {
-    if (tg) {
-        tg.sendData(JSON.stringify(data));
-    }
-}
-
-// Функция для отправки уведомления в Telegram
-function sendNotificationToTelegram(message) {
-    if (tg) {
-        tg.showPopup({
-            title: 'Уведомление',
-            message: message,
-            buttons: [{
-                type: 'ok'
-            }]
-        });
-    }
-}
-
-// Функция для сохранения настроек в Telegram
-function saveSettingsToTelegram(settings) {
-    if (tg) {
-        tg.MainButton.setText('Сохранить настройки');
-        tg.MainButton.show();
-        tg.MainButton.onClick(() => {
-            sendDataToTelegram({
-                type: 'save_settings',
-                data: settings
-            });
-            tg.MainButton.hide();
-        });
-    }
-}
-
-// Функция для настройки кнопки "Поделиться"
-function setupShareButton() {
-    if (tg) {
-        const shareButton = document.createElement('button');
-        shareButton.className = 'share-button';
-        shareButton.innerHTML = '<i class="fas fa-share-alt"></i>';
-        shareButton.onclick = () => {
-            tg.shareUrl({
-                url: window.location.href,
-                title: 'Radio ToT - Слушайте любимое радио!'
-            });
-        };
-        document.querySelector('.player-container').appendChild(shareButton);
-    }
-}
-
-// Функция для настройки кнопки "Назад"
-function setupBackButton() {
-    if (tg) {
-        const backButton = document.createElement('button');
-        backButton.className = 'back-button';
-        backButton.innerHTML = '<i class="fas fa-arrow-left"></i>';
-        backButton.onclick = () => {
-            tg.close();
-        };
-        document.querySelector('header').prepend(backButton);
-    }
-}
-
-// Функция для сохранения избранных станций в Telegram
-function saveFavoritesToTelegram() {
-    if (tg) {
-        const favorites = Array.from(document.querySelectorAll('.favorite-button.active'))
-            .map(button => button.closest('.radio-card').querySelector('.radio-name').textContent);
-        
-        saveSettingsToTelegram({
-            favorites: favorites,
-            lastStation: currentStation,
-            volume: elements.player.volume
-        });
-    }
-}
-
-// Функция для загрузки настроек из Telegram
-function loadSettingsFromTelegram() {
-    if (tg) {
-        const settings = tg.initDataUnsafe.settings;
-        if (settings) {
-            try {
-                const parsedSettings = JSON.parse(settings);
-                if (parsedSettings.favorites) {
-                    parsedSettings.favorites.forEach(station => {
-                        const button = document.querySelector(`.radio-card:has(.radio-name:contains('${station}')) .favorite-button`);
-                        if (button) {
-                            button.classList.add('active');
-                            button.innerHTML = '<i class="fas fa-heart"></i>';
-                        }
-                    });
-                }
-                if (parsedSettings.lastStation) {
-                    currentStation = parsedSettings.lastStation;
-                    elements.currentStationEl.textContent = currentStation;
-                }
-                if (parsedSettings.volume) {
-                    elements.player.volume = parsedSettings.volume;
-                }
-            } catch (e) {
-                console.error('Error parsing settings:', e);
-            }
-        }
-    }
-}
-
-// Функция для анимации ASCII-котика
-function animateCat() {
-    const catElement = document.getElementById('ascii-cat');
-    let frameIndex = 0;
+// Отображение радиостанций
+function displayRadioStations() {
+    if (!elements.radioList) return;
     
-    const animation = setInterval(() => {
-        catElement.textContent = catFrames[frameIndex];
-        frameIndex = (frameIndex + 1) % catFrames.length;
-    }, 500);
+    elements.radioList.innerHTML = '';
     
-    return animation;
-}
-
-// Проверка необходимых элементов
-function checkRequiredElements() {
-    const requiredElements = {
-        'radio-list': elements.radioList,
-        'player': elements.player,
-        'current-station': elements.currentStationEl,
-        'loading': elements.loadingIndicator,
-        'animation-container': document.getElementById('animation-container')
-    };
-
-    for (const [name, element] of Object.entries(requiredElements)) {
-        if (!element) {
-            console.error(`Required element "${name}" not found`);
-            showNotification(`Ошибка инициализации: элемент "${name}" не найден`, 'error');
-            return false;
-        }
-    }
-    return true;
-}
-
-// Инициализация приложения
-document.addEventListener("DOMContentLoaded", () => {
-    // Проверяем наличие необходимых элементов
-    if (!checkRequiredElements()) {
-        return;
-    }
-    
-    // Запускаем анимацию котика
-    const catAnimation = animateCat();
-    
-    // Добавляем обработчик клика для приветственного экрана
-    const welcomeScreen = document.getElementById('welcome-screen');
-    welcomeScreen.addEventListener('click', () => {
-        clearInterval(catAnimation);
-        welcomeScreen.style.display = 'none';
-        
-        // Инициализируем основное приложение
-        loadFavorites();
-        loadLastStation();
-        createCategories();
-        displayRadioStations(activeCategory);
-        setupKeyboardShortcuts();
-        setupTelegramTheme();
-        initTelegramWebApp();
-        loadSettingsFromTelegram();
-    });
-});
-
-// Настройка темы Telegram
-function setupTelegramTheme() {
-    try {
-        if (!tg) return;
-
-        const theme = tg.themeParams || {};
-        
-        // Применяем цвета темы Telegram
-        document.documentElement.style.setProperty('--bg-primary', theme.bg_color || '#ffffff');
-        document.documentElement.style.setProperty('--text-primary', theme.text_color || '#000000');
-        document.documentElement.style.setProperty('--accent-color', theme.button_color || '#0088cc');
-        document.documentElement.style.setProperty('--button-text', theme.button_text_color || '#ffffff');
-        
-        // Добавляем класс темы
-        document.body.classList.toggle('dark-theme', theme.text_color === '#ffffff');
-    } catch (error) {
-        console.error('Ошибка настройки темы:', error);
-    }
-}
-
-// Загрузка избранных станций
-function loadFavorites() {
-    const savedFavorites = localStorage.getItem("radioFavorites");
-    if (savedFavorites) favorites = JSON.parse(savedFavorites);
-}
-
-// Сохранение избранных станций
-function saveFavorites() {
-    localStorage.setItem("radioFavorites", JSON.stringify(favorites));
-}
-
-// Загрузка последней станции
-function loadLastStation() {
-    const lastStation = localStorage.getItem("lastStation");
-    if (lastStation) {
-        currentStation = lastStation;
-        updateCurrentStationDisplay();
-    }
-}
-
-// Сохранение последней станции
-function saveLastStation() {
-    localStorage.setItem("lastStation", currentStation);
-}
-
-// Обновляем функцию создания категорий
-function createCategories() {
-    const categories = new Set(Object.values(radioStations).map(station => station.category));
-    const sortedCategories = Array.from(categories).sort();
-    const categoriesList = document.getElementById('categories-list');
-    
-    categoriesList.innerHTML = "";
-    
-    sortedCategories.forEach(category => {
-        const li = document.createElement('li');
-        const link = document.createElement('a');
-        link.href = '#';
-        link.className = 'nav-item';
-        if (category === activeCategory) link.classList.add('active');
-        link.setAttribute('data-category', category);
-        
-        const icon = document.createElement('i');
-        icon.className = 'fas ' + getCategoryIcon(category);
-        
-        const text = document.createTextNode(getCategoryName(category));
-        
-        link.appendChild(icon);
-        link.appendChild(text);
-        
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            link.classList.add('active');
-            activeCategory = category;
-            document.getElementById('current-category').textContent = getCategoryName(category);
-            displayRadioStations(category);
-        });
-        
-        li.appendChild(link);
-        categoriesList.appendChild(li);
-    });
-}
-
-// Функция для получения названия категории
-function getCategoryName(category) {
-    const categoryNames = {
-        "Поп": "Поп-музыка",
-        "Танцевальные": "Танцевальная музыка",
-        "Рок": "Рок музыка",
-        "Ретро": "Ретро хиты",
-        "Джаз": "Джаз и Блюз",
-        "Релакс": "Релакс и Чилаут",
-        "Хип-Хоп": "Хип-Хоп и R&B",
-        "Классика": "Классическая музыка",
-        "Новости": "Новости и Разговорные",
-        "Шансон": "Шансон и Народные"
-    };
-    return categoryNames[category] || category;
-}
-
-// Получение иконки для категории
-function getCategoryIcon(category) {
-    const icons = {
-        "Все": "fa-globe",
-        "Избранное": "fa-heart",
-        "Танцевальные": "fa-music",
-        "Рок": "fa-guitar",
-        "Хип-Хоп": "fa-music",
-        "Джаз": "fa-music",
-        "Классика": "fa-music",
-        "Поп": "fa-music",
-        "Шансон": "fa-music",
-        "Ретро": "fa-clock",
-        "Международные": "fa-globe",
-        "Новости": "fa-newspaper",
-        "Экспериментальные": "fa-music"
-    };
-    return icons[category] || "fa-music";
-}
-
-// Оптимизированная функция отображения радиостанций
-function displayRadioStations(category = "Все") {
-    const radioList = document.getElementById('radio-list');
-    if (!radioList) return;
-    
-    radioList.innerHTML = '';
-    
-    // Создаем фрагмент для оптимизации производительности
-    const fragment = document.createDocumentFragment();
-    
-    // Фильтруем станции по категории
-    const stations = Object.entries(radioStations).filter(([name, station]) => {
-        if (category === "Все") return true;
-        if (category === "Избранное") return favorites.includes(name);
-        return station.category === category;
-    });
-    
-    if (stations.length === 0) {
-        const noResults = document.createElement('div');
-        noResults.className = 'no-results';
-        noResults.innerHTML = `
-            <i class="fas fa-broadcast-tower"></i>
-            <p>Станции не найдены</p>
-        `;
-        radioList.appendChild(noResults);
-        return;
-    }
-    
-    stations.forEach(([name, station]) => {
+    Object.entries(radioStations).forEach(([name, station]) => {
         const card = document.createElement('div');
         card.className = 'radio-card';
-        if (currentStation === name) {
-            card.classList.add('active');
-        }
         
         card.innerHTML = `
             <div class="station-info">
                 <h3 class="radio-name">${name}</h3>
                 <div class="station-details">
-                    <i class="fas fa-music"></i>
-                    <span>${getCategoryName(station.category)}</span>
-                    ${station.bitrate ? `<span>${station.bitrate} kbps</span>` : ''}
+                    <span>${station.category}</span>
+                    <span>${station.bitrate}</span>
                 </div>
             </div>
-            <div class="station-controls">
-                <button class="play-button" aria-label="Воспроизвести">
-                    <i class="fas ${currentStation === name ? 'fa-pause' : 'fa-play'}"></i>
-                </button>
-                <button class="favorite-button ${favorites.includes(name) ? 'active' : ''}" aria-label="Добавить в избранное">
-                    <i class="fas fa-heart"></i>
-                </button>
-            </div>
+            <button class="play-button" aria-label="Воспроизвести">
+                <i class="fas fa-play"></i>
+            </button>
         `;
         
-        // Добавляем обработчики событий
         const playButton = card.querySelector('.play-button');
-        playButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (currentStation === name) {
-                togglePlayPause();
-            } else {
-                playStation(name, station.url);
-            }
+        playButton.addEventListener('click', () => {
+            playStation(name, station.url);
         });
         
-        const favoriteButton = card.querySelector('.favorite-button');
-        favoriteButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleFavorite(favoriteButton, name);
-        });
-        
-        fragment.appendChild(card);
+        elements.radioList.appendChild(card);
     });
-    
-    radioList.appendChild(fragment);
 }
 
-// Проверка поддержки аудио форматов
-function checkAudioSupport() {
-    const audio = document.createElement('audio');
-    const formats = {
-        mp3: audio.canPlayType('audio/mpeg'),
-        aac: audio.canPlayType('audio/aac'),
-        ogg: audio.canPlayType('audio/ogg'),
-        wav: audio.canPlayType('audio/wav')
-    };
-    
-    // Определяем предпочтительный формат
-    const preferredFormat = Object.entries(formats).find(([_, support]) => 
-        support === 'probably' || support === 'maybe'
-    );
-    
-    if (!preferredFormat) {
-        showNotification('Ваш браузер может не поддерживать некоторые форматы аудио.', 'warning');
-        return null;
-    }
-    
-    return preferredFormat[0];
-}
-
-// Обновляем функцию воспроизведения с учетом поддержки форматов
+// Воспроизведение радиостанции
 async function playStation(name, url) {
     try {
-        if (!name || !url) {
-            throw new Error('Не указано имя или URL станции');
-        }
+        if (currentStation === name && !elements.player.paused) {
+            elements.player.pause();
+            updatePlayerButtons();
+        return;
+    }
 
-        if (!navigator.onLine) {
-            throw new Error('Нет подключения к интернету');
-        }
-
-        elements.loadingIndicator.style.display = 'flex';
+        elements.player.src = url;
+        await elements.player.play();
         
-        // Проверяем поддержку форматов
-        const supportedFormat = checkAudioSupport();
-        if (!supportedFormat) {
-            throw new Error('Неподдерживаемый формат аудио');
-        }
-        
-        // Проверяем доступность потока
-        const isAvailable = await checkStreamAvailability(url);
-        if (!isAvailable) {
-            throw new Error('Станция временно недоступна');
-        }
-
-        // Создаем новый экземпляр Audio для проверки
-        const audio = new Audio();
-        
-        // Добавляем обработчик ошибок
-        audio.onerror = (error) => {
-            console.error('Error loading audio:', error);
-            throw new Error('Ошибка загрузки аудио');
-        };
-        
-        audio.src = url;
-        
-        // Добавляем обработчики событий для аудио
-        audio.addEventListener('canplaythrough', () => {
-            try {
-                elements.player.src = url;
-                elements.player.play()
-                    .catch(error => {
-                        console.error('Playback error:', error);
-                        throw new Error('Ошибка воспроизведения');
-                    });
-                
-                currentStation = name;
-                elements.currentStationEl.textContent = name;
-                
-                // Обновляем состояние кнопок
-                updatePlayerButtons();
-                
-                // Показываем анимацию воспроизведения
-                document.getElementById('animation-container').classList.add('active');
-                
-                // Отправляем уведомление в Telegram
-                sendNotificationToTelegram(`Сейчас играет: ${name}`);
-                
-                // Сохраняем настройки
-                saveSettingsToTelegram({
-                    lastStation: name,
-                    volume: elements.player.volume
-                });
-            } catch (error) {
-                console.error('Error in canplaythrough handler:', error);
-                throw error;
-            }
-        });
-
-        // Добавляем таймаут для загрузки
-        const loadTimeout = setTimeout(() => {
-            if (elements.loadingIndicator.style.display === 'flex') {
-                elements.loadingIndicator.style.display = 'none';
-                throw new Error('Превышено время ожидания загрузки');
-            }
-        }, 10000);
-
-        // Очищаем таймаут при успешной загрузке
-        audio.addEventListener('canplay', () => {
-            clearTimeout(loadTimeout);
-            elements.loadingIndicator.style.display = 'none';
-        });
+        currentStation = name;
+        elements.currentStationEl.textContent = name;
+        updatePlayerButtons();
         
     } catch (error) {
-        console.error('Error playing station:', error);
-        showNotification(error.message || `Ошибка воспроизведения ${name}`, 'error');
-        elements.loadingIndicator.style.display = 'none';
-        document.getElementById('animation-container').classList.remove('active');
-        
-        // Увеличиваем счетчик попыток
-        retryCount++;
-        if (retryCount >= MAX_RETRIES) {
-            showNotification('Превышено количество попыток. Попробуйте другую станцию.', 'error');
-            retryCount = 0;
-        }
+        console.error('Ошибка воспроизведения:', error);
+        showNotification('Ошибка воспроизведения станции', 'error');
     }
 }
 
-// Обновление состояния кнопок плеера
+// Обновление кнопок плеера
 function updatePlayerButtons() {
     document.querySelectorAll('.radio-card').forEach(card => {
         const playButton = card.querySelector('.play-button');
-        if (card.querySelector('.radio-name').textContent === currentStation) {
-            card.classList.add('active');
-            playButton.innerHTML = '<i class="fas fa-pause"></i>';
-        } else {
-            card.classList.remove('active');
-            playButton.innerHTML = '<i class="fas fa-play"></i>';
-        }
-    });
-}
-
-// Обновляем функцию переключения воспроизведения
-function togglePlayPause() {
-    const playPauseButton = document.getElementById('play-pause');
-    const animationContainer = document.getElementById('animation-container');
-    
-    if (elements.player.paused) {
-        elements.player.play();
-        playPauseButton.innerHTML = '<i class="fas fa-pause"></i>';
-        animationContainer.classList.add('active');
-    } else {
-        elements.player.pause();
-        playPauseButton.innerHTML = '<i class="fas fa-play"></i>';
-        animationContainer.classList.remove('active');
-    }
-    
-    // Обновляем состояние кнопок на карточках
-    document.querySelectorAll('.radio-card').forEach(card => {
-        if (card.classList.contains('active')) {
-            const playButton = card.querySelector('.play-button');
-            playButton.innerHTML = elements.player.paused ? 
-                '<i class="fas fa-play"></i>' : 
-                '<i class="fas fa-pause"></i>';
-        }
-    });
-}
-
-// Обновляем функцию переключения избранного
-function toggleFavorite(button, stationName) {
-    button.classList.toggle('active');
-    
-    if (button.classList.contains('active')) {
-        button.innerHTML = '<i class="fas fa-heart"></i>';
-        if (!favorites.includes(stationName)) {
-            favorites.push(stationName);
-        }
-        showNotification(`${stationName} добавлена в избранное`, 'success');
-    } else {
-        button.innerHTML = '<i class="far fa-heart"></i>';
-        favorites = favorites.filter(name => name !== stationName);
-        showNotification(`${stationName} удалена из избранного`, 'success');
-    }
-    
-    // Добавляем анимацию
-    button.classList.add('pulse');
-    setTimeout(() => button.classList.remove('pulse'), 500);
-    
-    // Сохраняем изменения
-    saveFavorites();
-    saveFavoritesToTelegram();
-    
-    // Обновляем отображение если мы находимся в категории Избранное
-    if (activeCategory === "Избранное") {
-        displayRadioStations("Избранное");
-    }
-}
-
-// Кэш для проверки доступности потоков
-const streamAvailabilityCache = new Map();
-const CACHE_TIMEOUT = 60000; // 1 минута
-
-// Улучшенная проверка состояния сети
-async function checkNetworkState() {
-    try {
-        const response = await fetch('https://www.google.com/favicon.ico', {
-            mode: 'no-cors',
-            cache: 'no-cache'
-        });
-        return true;
-    } catch (error) {
-        return false;
-    }
-}
-
-function handleNetworkChange() {
-    isOnline = navigator.onLine;
-    
-    checkNetworkState().then(isConnected => {
-        if (isConnected) {
-            networkStatusElement.innerHTML = `
-                <i class="fas fa-wifi"></i>
-                <span>Соединение восстановлено</span>
-            `;
-            networkStatusElement.classList.add('online');
-            networkStatusElement.classList.add('show');
-            
-            // Если была играющая станция, пробуем восстановить воспроизведение
-            if (currentStation && elements.player.paused) {
-                setTimeout(() => {
-                    playStation(currentStation, radioStations[currentStation].url);
-                }, 1000);
-            }
-        } else {
-            networkStatusElement.innerHTML = `
-                <i class="fas fa-wifi-slash"></i>
-                <span>Нет соединения</span>
-            `;
-            networkStatusElement.classList.remove('online');
-            networkStatusElement.classList.add('show');
-            
-            // Приостанавливаем воспроизведение при потере соединения
-            if (currentStation && !elements.player.paused) {
-                elements.player.pause();
-                document.getElementById('animation-container').classList.remove('active');
-                showNotification('Потеряно соединение. Воспроизведение приостановлено.', 'error');
-            }
-        }
+        const isCurrentStation = card.querySelector('.radio-name').textContent === currentStation;
         
-        // Скрываем статус через 3 секунды
-        setTimeout(() => {
-            networkStatusElement.classList.remove('show');
-        }, 3000);
-    });
-}
-
-// Настройка мониторинга сети
-function setupNetworkMonitoring() {
-    // Создаем элемент для отображения статуса сети
-    networkStatusElement = document.createElement('div');
-    networkStatusElement.className = 'network-status';
-    document.body.appendChild(networkStatusElement);
-    
-    // Добавляем обработчики событий
-    window.addEventListener('online', handleNetworkChange);
-    window.addEventListener('offline', handleNetworkChange);
-    
-    // Запускаем периодическую проверку
-    networkCheckInterval = setInterval(async () => {
-        const isConnected = await checkNetworkState();
-        if (isConnected !== isOnline) {
-            handleNetworkChange();
-        }
-    }, 30000);
-    
-    // Выполняем начальную проверку
-    handleNetworkChange();
-}
-
-// Улучшенная функция проверки доступности потока
-async function checkStreamAvailability(url) {
-    // Проверяем кэш
-    const cached = streamAvailabilityCache.get(url);
-    if (cached && Date.now() - cached.timestamp < CACHE_TIMEOUT) {
-        return cached.available;
-    }
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
-
-        const response = await fetch(url, { 
-            method: 'HEAD',
-            signal: controller.signal,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; RadioToTBot/1.0;)'
-            }
-        });
-
-        clearTimeout(timeoutId);
-        
-        const available = response.ok;
-        
-        // Сохраняем результат в кэш
-        streamAvailabilityCache.set(url, {
-            available,
-            timestamp: Date.now()
-        });
-        
-        return available;
-    } catch (error) {
-        console.error('Ошибка проверки потока:', error);
-        
-        // В случае ошибки сети проверяем состояние соединения
-        if (!navigator.onLine) {
-            throw new Error('Нет подключения к интернету');
-        }
-        
-        // В случае ошибки считаем поток доступным, 
-        // так как некоторые станции могут блокировать HEAD-запросы
-        return true;
-    }
-}
-
-// Очистка ресурсов при выгрузке страницы
-window.addEventListener('beforeunload', () => {
-    if (networkCheckInterval) {
-        clearInterval(networkCheckInterval);
-    }
-    if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-    }
-    if (sleepTimeout) {
-        clearTimeout(sleepTimeout);
-    }
-});
-
-// Оптимизация поиска
-const debouncedSearch = debounce((searchTerm) => {
-    const stations = Object.entries(radioStations);
-    const searchTermLower = searchTerm.toLowerCase();
-    
-    requestAnimationFrame(() => {
-        const filteredStations = stations.filter(([name, station]) => 
-            name.toLowerCase().includes(searchTermLower) || 
-            station.category.toLowerCase().includes(searchTermLower)
-        );
-        displayFilteredStations(filteredStations);
-    });
-}, 300);
-
-// Добавляем обработчик для поиска
-elements.searchInput.addEventListener("input", (e) => {
-    const searchTerm = e.target.value.toLowerCase();
-    debouncedSearch(searchTerm);
-});
-
-// Обновление отображения текущей станции
-function updateCurrentStationDisplay() {
-    elements.currentStationEl.textContent = `Сейчас играет: ${currentStation || "не выбрано"}`;
-}
-
-// Настройка управления громкостью
-function setupVolumeControl() {
-    const volumeSlider = document.querySelector(".volume-slider");
-    const volumeControl = document.querySelector(".volume-control");
-    const volumeIcon = document.querySelector(".volume-control i");
-    let isVolumeVisible = false;
-    
-    // Установка начального значения громкости
-    volumeSlider.value = elements.player.volume;
-    updateVolumeIcon(elements.player.volume);
-    
-    // Обработчик изменения громкости
-    volumeSlider.addEventListener("input", (e) => {
-        const volume = parseFloat(e.target.value);
-        elements.player.volume = volume;
-        updateVolumeIcon(volume);
-        saveVolume();
-    });
-
-    // Обработчик нажатия на иконку громкости
-    volumeIcon.addEventListener("click", () => {
-        isVolumeVisible = !isVolumeVisible;
-        volumeControl.classList.toggle("show", isVolumeVisible);
-        
-        // Автоматически скрываем через 3 секунды
-        if (isVolumeVisible) {
-            setTimeout(() => {
-                isVolumeVisible = false;
-                volumeControl.classList.remove("show");
-            }, 3000);
-        }
-    });
-
-    // Скрываем регулятор при клике вне его области
-    document.addEventListener("click", (e) => {
-        if (!volumeControl.contains(e.target) && isVolumeVisible) {
-            isVolumeVisible = false;
-            volumeControl.classList.remove("show");
-        }
-    });
-}
-
-// Обновление иконки громкости
-function updateVolumeIcon(volume) {
-    const icon = document.querySelector(".volume-control i");
-    if (volume === 0) {
-        icon.className = "fas fa-volume-mute";
-    } else if (volume < 0.5) {
-        icon.className = "fas fa-volume-down";
-    } else {
-        icon.className = "fas fa-volume-up";
-    }
-}
-
-// Переключение режима без звука
-function toggleMute() {
-    const volumeSlider = document.querySelector(".volume-slider");
-    elements.player.muted = !elements.player.muted;
-    
-    if (elements.player.muted) {
-        volumeSlider.value = 0;
-    } else {
-        volumeSlider.value = elements.player.volume;
-    }
-    
-    updateVolumeIcon(elements.player.volume);
-    saveVolume();
-}
-
-// Настройка горячих клавиш
-function setupKeyboardShortcuts() {
-    document.addEventListener("keydown", (e) => {
-        switch(e.code) {
-            case "Space":
-                e.preventDefault();
-                if (currentStation) togglePlayPause();
-                break;
-            case "ArrowRight":
-                playRandomStation();
-                break;
-            case "ArrowLeft":
-                // Добавляем возможность переключения на предыдущую станцию
-                const stations = Object.keys(radioStations);
-                const currentIndex = stations.indexOf(currentStation);
-                if (currentIndex > 0) {
-                    const prevStation = stations[currentIndex - 1];
-                    playStation(prevStation, radioStations[prevStation].url);
-                }
-                break;
-        }
+        playButton.innerHTML = isCurrentStation && !elements.player.paused ? 
+            '<i class="fas fa-pause"></i>' : 
+            '<i class="fas fa-play"></i>';
     });
 }
 
 // Показ уведомлений
-function showNotification(message, type = "success") {
-    const notification = document.createElement("div");
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
     notification.className = `notification ${type}`;
-    notification.innerHTML = `
-        <i class="fas ${type === "success" ? "fa-check-circle" : "fa-exclamation-circle"}"></i>
-        <span>${message}</span>
-    `;
+    notification.textContent = message;
     
     document.body.appendChild(notification);
+    setTimeout(() => notification.classList.add('show'), 100);
     
     setTimeout(() => {
-        notification.classList.add("show");
-    }, 100);
-    
-    setTimeout(() => {
-        notification.classList.remove("show");
-        setTimeout(() => {
-            notification.remove();
-        }, 300);
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
     }, 3000);
 }
 
-// Случайная станция
-function playRandomStation() {
-    const stations = Object.entries(radioStations);
-    const [randomName, randomStation] = stations[Math.floor(Math.random() * stations.length)];
-    
-    // Добавляем анимацию для кнопки случайной станции
-    elements.randomButton.classList.add('active');
-    setTimeout(() => {
-        elements.randomButton.classList.remove('active');
-    }, 500);
-    
-    playStation(randomName, randomStation.url);
-}
-
-// Отображение отфильтрованных станций
-function displayFilteredStations(stations) {
-    elements.radioList.innerHTML = "";
-    
-    if (stations.length === 0) {
-        elements.radioList.innerHTML = `
-            <div class="no-results">
-                <i class="fas fa-search"></i>
-                <p>Станции не найдены</p>
-            </div>
-        `;
-        return;
-    }
-    
-    stations.forEach(([name, station]) => createRadioCard(name, station));
-}
-
-// Улучшаем функцию таймера сна
-function setSleepTimer(minutes) {
-    const sleepTimerControl = document.querySelector(".sleep-timer-control");
-    const sleepTimerInput = document.getElementById("sleep-timer");
-    
-    if (sleepTimeout) {
-        clearTimeout(sleepTimeout);
-        showNotification("Таймер сна отменен");
-        sleepTimerInput.value = "";
-        sleepTimerControl.classList.remove("show");
-    }
-    
-    if (minutes > 0) {
-        sleepTimeout = setTimeout(() => {
-            elements.player.pause();
-            showNotification("Таймер сна: воспроизведение остановлено");
-            sleepTimerInput.value = "";
-            sleepTimerControl.classList.remove("show");
-        }, minutes * 60000);
-        showNotification(`Таймер сна установлен на ${minutes} минут`);
-        sleepTimerControl.classList.add("show");
-    }
-}
-
-// Добавляем обработчик для таймера сна
-document.getElementById("sleep-timer").addEventListener("change", (e) => {
-    const minutes = parseInt(e.target.value);
-    if (minutes > 0 && minutes <= 120) {
-        setSleepTimer(minutes);
-    }
-});
-
-// Добавляем обработчик для отображения таймера сна
-document.querySelector(".sleep-timer-control i").addEventListener("click", () => {
-    const sleepTimerControl = document.querySelector(".sleep-timer-control");
-    sleepTimerControl.classList.toggle("show");
-});
-
-// Скрываем таймер сна при клике вне его области
-document.addEventListener("click", (e) => {
-    const sleepTimerControl = document.querySelector(".sleep-timer-control");
-    const sleepTimerIcon = document.querySelector(".sleep-timer-control i");
-    
-    if (!sleepTimerControl.contains(e.target) && 
-        !sleepTimerIcon.contains(e.target) && 
-        sleepTimerControl.classList.contains("show")) {
-        sleepTimerControl.classList.remove("show");
-    }
-});
-
-// Добавляем дебаунс для поиска
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Добавляем обработку свайпов для мобильных устройств
-let touchStartX = 0;
-let touchEndX = 0;
-
-document.addEventListener('touchstart', (e) => {
-    touchStartX = e.changedTouches[0].screenX;
-});
-
-document.addEventListener('touchend', (e) => {
-    touchEndX = e.changedTouches[0].screenX;
-    handleSwipe();
-});
-
-function handleSwipe() {
-    const swipeThreshold = 50;
-    const diff = touchEndX - touchStartX;
-    
-    if (Math.abs(diff) > swipeThreshold) {
-        if (diff > 0) {
-            // Свайп вправо - предыдущая станция
-            const stations = Object.keys(radioStations);
-            const currentIndex = stations.indexOf(currentStation);
-            if (currentIndex > 0) {
-                const prevStation = stations[currentIndex - 1];
-                playStation(prevStation, radioStations[prevStation].url);
-            }
-        } else {
-            // Свайп влево - следующая станция
-            playRandomStation();
-        }
-    }
-}
-
-// Обработка состояний загрузки
-let loadingTimeout;
-
-elements.player.addEventListener('waiting', () => {
-    elements.loadingIndicator.style.display = 'flex';
-    document.getElementById('animation-container').classList.remove('active');
-    
-    // Устанавливаем таймаут для загрузки
-    loadingTimeout = setTimeout(() => {
-        if (elements.loadingIndicator.style.display === 'flex') {
-            elements.loadingIndicator.style.display = 'none';
-            showNotification('Превышено время ожидания загрузки. Попробуйте еще раз.', 'error');
-            retryCount++;
-            if (retryCount >= MAX_RETRIES) {
-                showNotification('Не удалось загрузить станцию. Попробуйте другую.', 'error');
-            }
-        }
-    }, 10000); // 10 секунд таймаут
-});
-
-elements.player.addEventListener('playing', () => {
-    clearTimeout(loadingTimeout);
-    elements.loadingIndicator.style.display = 'none';
-    document.getElementById('animation-container').classList.add('active');
-    retryCount = 0; // Сбрасываем счетчик попыток при успешном воспроизведении
-});
-
-elements.player.addEventListener('canplay', () => {
-    clearTimeout(loadingTimeout);
-    elements.loadingIndicator.style.display = 'none';
-});
-
 // Настройка обработчиков событий
 function setupEventListeners() {
-    // Поиск с debounce
-    elements.searchInput.addEventListener('input', debounce(handleSearch, 300));
-
-    // Фильтры
-    elements.filterButton.addEventListener('click', toggleFilters);
-    document.querySelectorAll('.filter-option').forEach(option => {
-        option.addEventListener('click', handleFilterChange);
+    elements.player.addEventListener('error', () => {
+        showNotification('Ошибка воспроизведения станции', 'error');
     });
-
-    // Управление видом
-    elements.viewControls.addEventListener('click', handleViewChange);
-
-    // Громкость
-    elements.volumeSlider.addEventListener('input', handleVolumeChange);
-
-    // Настройки
-    elements.settingsButton.addEventListener('click', toggleSettings);
-    elements.themeToggle.addEventListener('click', toggleTheme);
-    elements.shareButton.addEventListener('click', shareApp);
-    elements.sleepTimerButton.addEventListener('click', showSleepTimer);
-
-    // Модальные окна
-    elements.modalCloseButtons.forEach(button => {
-        button.addEventListener('click', closeModal);
-    });
-
-    // Таймер сна
-    elements.timerOptions.addEventListener('click', handleTimerOption);
-}
-
-// Обработка поиска
-function handleSearch(event) {
-    const searchTerm = event.target.value.toLowerCase();
-    const filteredStations = Object.entries(radioStations).filter(([name]) => 
-        name.toLowerCase().includes(searchTerm)
-    );
-    renderRadioStations(filteredStations);
-}
-
-// Переключение фильтров
-function toggleFilters() {
-    elements.filtersPanel.classList.toggle('show');
-}
-
-// Обработка изменения фильтра
-function handleFilterChange(event) {
-    const filter = event.currentTarget.dataset.filter;
-    const value = event.currentTarget.dataset.value;
     
-    // Обновление состояния фильтра
-    event.currentTarget.classList.toggle('active');
-    
-    // Применение фильтра
-    applyFilters();
-}
-
-// Применение фильтров
-function applyFilters() {
-    const activeFilters = document.querySelectorAll('.filter-option.active');
-    let filteredStations = Object.entries(radioStations);
-
-    activeFilters.forEach(filter => {
-        const filterType = filter.dataset.filter;
-        const filterValue = filter.dataset.value;
-
-        filteredStations = filteredStations.filter(([name, station]) => {
-            switch (filterType) {
-                case 'quality':
-                    return station.bitrate === filterValue;
-                case 'category':
-                    return station.category === filterValue;
-                default:
-                    return true;
-            }
-        });
+    elements.player.addEventListener('playing', () => {
+        elements.loadingIndicator.style.display = 'none';
     });
-
-    renderRadioStations(filteredStations);
-}
-
-// Переключение вида списка
-function handleViewChange(event) {
-    if (event.target.classList.contains('view-button')) {
-        const view = event.target.dataset.view;
-        elements.radioGrid.className = `radio-grid ${view}-view`;
-        
-        // Обновление активной кнопки
-        elements.viewControls.querySelectorAll('.view-button').forEach(button => {
-            button.classList.remove('active');
-        });
-        event.target.classList.add('active');
-    }
-}
-
-// Обработка изменения громкости
-function handleVolumeChange(event) {
-    const volume = event.target.value / 100;
-    elements.audioPlayer.volume = volume;
-    saveSettingsToTelegram({ volume });
-}
-
-// Переключение настроек
-function toggleSettings() {
-    elements.sidebar.classList.toggle('show');
-}
-
-// Переключение темы
-function toggleTheme() {
-    document.body.classList.toggle('light-theme');
-    document.body.classList.toggle('colored-theme');
-    saveSettingsToTelegram({ theme: document.body.className });
-}
-
-// Поделиться приложением
-function shareApp() {
-    if (window.Telegram && window.Telegram.WebApp) {
-        window.Telegram.WebApp.share();
-    }
-}
-
-// Показать таймер сна
-function showSleepTimer() {
-    elements.sleepTimerModal.classList.add('show');
-}
-
-// Обработка выбора таймера
-function handleTimerOption(event) {
-    if (event.target.classList.contains('timer-option')) {
-        const minutes = parseInt(event.target.dataset.minutes);
-        setSleepTimer(minutes);
-        closeModal(elements.sleepTimerModal);
-    }
-}
-
-// Закрытие модального окна
-function closeModal(modal) {
-    modal.classList.remove('show');
+    
+    elements.player.addEventListener('waiting', () => {
+        elements.loadingIndicator.style.display = 'flex';
+    });
 }

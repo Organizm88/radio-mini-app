@@ -619,22 +619,20 @@ const radioStations = {
 const elements = {
     sidebar: document.querySelector('.sidebar'),
     mainContent: document.querySelector('.main-content'),
-    radioGrid: document.querySelector('.radio-grid'),
+    radioList: document.getElementById('radio-list'),
     playerBar: document.querySelector('.player-bar'),
-    audioPlayer: document.querySelector('#audio-player'),
-    searchInput: document.querySelector('#search-input'),
-    filterButton: document.querySelector('.filter-button'),
-    filtersPanel: document.querySelector('.filters-panel'),
+    player: document.getElementById('player'),
+    searchInput: document.getElementById('search-input'),
+    filterButton: document.getElementById('filter-button'),
+    filtersPanel: document.getElementById('filters-panel'),
     viewControls: document.querySelector('.view-controls'),
     volumeControl: document.querySelector('.volume-control'),
-    volumeSlider: document.querySelector('#volume-slider'),
-    settingsButton: document.querySelector('.settings-button'),
-    themeToggle: document.querySelector('.theme-toggle'),
-    shareButton: document.querySelector('.share-button'),
-    sleepTimerButton: document.querySelector('.sleep-timer-button'),
-    sleepTimerModal: document.querySelector('.sleep-timer-modal'),
-    timerOptions: document.querySelector('.timer-options'),
-    modalCloseButtons: document.querySelectorAll('.modal-close')
+    volumeSlider: document.getElementById('volume-slider'),
+    currentStationEl: document.getElementById('current-station'),
+    loadingIndicator: document.getElementById('loading'),
+    modalCloseButtons: document.querySelectorAll('.modal-close'),
+    sleepTimerModal: document.getElementById('sleep-timer-modal'),
+    timerOptions: document.querySelector('.timer-options')
 };
 
 // Переменные состояния
@@ -822,8 +820,33 @@ function animateCat() {
     return animation;
 }
 
+// Проверка необходимых элементов
+function checkRequiredElements() {
+    const requiredElements = {
+        'radio-list': elements.radioList,
+        'player': elements.player,
+        'current-station': elements.currentStationEl,
+        'loading': elements.loadingIndicator,
+        'animation-container': document.getElementById('animation-container')
+    };
+
+    for (const [name, element] of Object.entries(requiredElements)) {
+        if (!element) {
+            console.error(`Required element "${name}" not found`);
+            showNotification(`Ошибка инициализации: элемент "${name}" не найден`, 'error');
+            return false;
+        }
+    }
+    return true;
+}
+
 // Инициализация приложения
 document.addEventListener("DOMContentLoaded", () => {
+    // Проверяем наличие необходимых элементов
+    if (!checkRequiredElements()) {
+        return;
+    }
+    
     // Запускаем анимацию котика
     const catAnimation = animateCat();
     
@@ -958,97 +981,87 @@ function getCategoryIcon(category) {
 
 // Оптимизированная функция отображения радиостанций
 function displayRadioStations(category = "Все") {
-    elements.radioList.innerHTML = "";
-    
-    let stationsToDisplay = Object.entries(radioStations);
-    if (category === "Избранное") {
-        stationsToDisplay = stationsToDisplay.filter(([name]) => favorites.includes(name));
-    } else if (category !== "Все") {
-        stationsToDisplay = stationsToDisplay.filter(([_, station]) => station.category === category);
+    if (!elements.radioList) {
+        console.error('Radio list element not found');
+        return;
     }
 
+    // Очищаем список
+    elements.radioList.innerHTML = "";
+    
+    // Фильтруем станции
+    let stationsToDisplay = Object.entries(radioStations);
+    
+    // Применяем фильтры
+    if (category !== "Все") {
+        if (category === "Избранное") {
+            stationsToDisplay = stationsToDisplay.filter(([name]) => favorites.includes(name));
+        } else {
+            stationsToDisplay = stationsToDisplay.filter(([_, station]) => station.category === category);
+        }
+    }
+
+    // Проверяем наличие станций
     if (stationsToDisplay.length === 0) {
         elements.radioList.innerHTML = `
             <div class="no-results">
-                <i class="fas fa-search"></i>
+                <i class="fas fa-broadcast-tower"></i>
                 <p>Станции не найдены</p>
             </div>
         `;
         return;
     }
 
-    // Используем DocumentFragment для оптимизации производительности
+    // Создаем фрагмент для оптимизации производительности
     const fragment = document.createDocumentFragment();
-    const batchSize = 20;
-    let currentBatch = 0;
 
-    function renderBatch() {
-        const start = currentBatch * batchSize;
-        const end = Math.min(start + batchSize, stationsToDisplay.length);
+    // Отображаем станции
+    stationsToDisplay.forEach(([name, station]) => {
+        const card = document.createElement('div');
+        card.className = `radio-card${currentStation === name ? ' active' : ''}`;
         
-        for (let i = start; i < end; i++) {
-            const [name, station] = stationsToDisplay[i];
-            createRadioCard(name, station, fragment);
-        }
-        
-        elements.radioList.appendChild(fragment);
-        currentBatch++;
-        
-        if (end < stationsToDisplay.length) {
-            // Если есть ещё станции для отображения, планируем следующий батч
-            requestAnimationFrame(renderBatch);
-        }
-    }
-
-    // Запускаем рендеринг первого батча
-    renderBatch();
-}
-
-// Оптимизированная функция создания карточки
-function createRadioCard(name, station, container = elements.radioList) {
-    const template = document.createElement('template');
-    template.innerHTML = `
-        <div class="radio-card ${name === currentStation ? 'active' : ''}" data-station="${name}">
+        card.innerHTML = `
             <div class="station-info">
                 <p class="radio-name">${name}</p>
                 <p class="station-details">
                     <i class="fas ${station.icon}"></i>
                     <span>${getCategoryName(station.category)}</span>
-                    <span>${station.bitrate}</span>
+                    <span class="bitrate">${station.bitrate}</span>
                 </p>
             </div>
             <div class="station-controls">
-                <button class="control-button">
-                    <i class="fas ${name === currentStation ? 'fa-pause' : 'fa-play'}"></i>
+                <button class="control-button" aria-label="Воспроизвести">
+                    <i class="fas ${currentStation === name ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
-                <button class="action-button ${favorites.includes(name) ? 'active' : ''}">
+                <button class="action-button${favorites.includes(name) ? ' active' : ''}" aria-label="Добавить в избранное">
                     <i class="${favorites.includes(name) ? 'fas' : 'far'} fa-heart"></i>
                 </button>
             </div>
-        </div>
-    `;
-    
-    const card = template.content.firstElementChild;
-    
-    // Используем делегирование событий вместо прямых обработчиков
-    card.addEventListener('click', (e) => {
-        const target = e.target.closest('button');
-        if (!target) return;
-        
-        e.stopPropagation();
-        
-        if (target.classList.contains('control-button')) {
+        `;
+
+        // Добавляем обработчики событий
+        const playButton = card.querySelector('.control-button');
+        const favoriteButton = card.querySelector('.action-button');
+
+        playButton.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (name === currentStation) {
                 togglePlayPause();
             } else {
                 playStation(name, station.url);
             }
-        } else if (target.classList.contains('action-button')) {
-            toggleFavorite(target);
-        }
+        });
+
+        favoriteButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFavorite(favoriteButton, name);
+        });
+
+        fragment.appendChild(card);
     });
-    
-    container.appendChild(card);
+
+    // Добавляем все карточки одним действием
+    elements.radioList.appendChild(fragment);
 }
 
 // Проверка поддержки аудио форматов
@@ -1081,6 +1094,10 @@ async function playStation(name, url) {
             throw new Error('Не указано имя или URL станции');
         }
 
+        if (!navigator.onLine) {
+            throw new Error('Нет подключения к интернету');
+        }
+
         elements.loadingIndicator.style.display = 'flex';
         
         // Проверяем поддержку форматов
@@ -1095,30 +1112,32 @@ async function playStation(name, url) {
             throw new Error('Станция временно недоступна');
         }
 
-        // Создаем новый экземпляр Audio
+        // Создаем новый экземпляр Audio для проверки
         const audio = new Audio();
+        
+        // Добавляем обработчик ошибок
+        audio.onerror = (error) => {
+            console.error('Error loading audio:', error);
+            throw new Error('Ошибка загрузки аудио');
+        };
+        
         audio.src = url;
         
         // Добавляем обработчики событий для аудио
         audio.addEventListener('canplaythrough', () => {
             try {
                 elements.player.src = url;
-                elements.player.play();
+                elements.player.play()
+                    .catch(error => {
+                        console.error('Playback error:', error);
+                        throw new Error('Ошибка воспроизведения');
+                    });
                 
                 currentStation = name;
                 elements.currentStationEl.textContent = name;
                 
                 // Обновляем состояние кнопок
-                document.querySelectorAll('.radio-card').forEach(card => {
-                    const playButton = card.querySelector('.control-button');
-                    if (card.querySelector('.radio-name').textContent === name) {
-                        card.classList.add('active');
-                        playButton.innerHTML = '<i class="fas fa-pause"></i>';
-                    } else {
-                        card.classList.remove('active');
-                        playButton.innerHTML = '<i class="fas fa-play"></i>';
-                    }
-                });
+                updatePlayerButtons();
                 
                 // Показываем анимацию воспроизведения
                 document.getElementById('animation-container').classList.add('active');
@@ -1136,15 +1155,11 @@ async function playStation(name, url) {
                 throw error;
             }
         });
-        
-        audio.addEventListener('error', (error) => {
-            console.error('Error playing station:', error);
-            throw new Error('Ошибка воспроизведения');
-        });
 
         // Добавляем таймаут для загрузки
         const loadTimeout = setTimeout(() => {
             if (elements.loadingIndicator.style.display === 'flex') {
+                elements.loadingIndicator.style.display = 'none';
                 throw new Error('Превышено время ожидания загрузки');
             }
         }, 10000);
@@ -1152,16 +1167,36 @@ async function playStation(name, url) {
         // Очищаем таймаут при успешной загрузке
         audio.addEventListener('canplay', () => {
             clearTimeout(loadTimeout);
+            elements.loadingIndicator.style.display = 'none';
         });
         
     } catch (error) {
         console.error('Error playing station:', error);
-        showNotification(error.message || `Ошибка воспроизведения ${name}. Попробуйте позже.`, 'error');
+        showNotification(error.message || `Ошибка воспроизведения ${name}`, 'error');
         elements.loadingIndicator.style.display = 'none';
         document.getElementById('animation-container').classList.remove('active');
-    } finally {
-        elements.loadingIndicator.style.display = 'none';
+        
+        // Увеличиваем счетчик попыток
+        retryCount++;
+        if (retryCount >= MAX_RETRIES) {
+            showNotification('Превышено количество попыток. Попробуйте другую станцию.', 'error');
+            retryCount = 0;
+        }
     }
+}
+
+// Обновление состояния кнопок плеера
+function updatePlayerButtons() {
+    document.querySelectorAll('.radio-card').forEach(card => {
+        const playButton = card.querySelector('.control-button');
+        if (card.querySelector('.radio-name').textContent === currentStation) {
+            card.classList.add('active');
+            playButton.innerHTML = '<i class="fas fa-pause"></i>';
+        } else {
+            card.classList.remove('active');
+            playButton.innerHTML = '<i class="fas fa-play"></i>';
+        }
+    });
 }
 
 // Обновляем функцию переключения воспроизведения
@@ -1190,99 +1225,115 @@ function togglePlayPause() {
     });
 }
 
-// Переключение избранного
-function toggleFavorite(button) {
-    const card = button.closest('.radio-card');
-    const stationName = card.querySelector('.radio-name').textContent;
-    
+// Обновляем функцию переключения избранного
+function toggleFavorite(button, stationName) {
     button.classList.toggle('active');
+    
     if (button.classList.contains('active')) {
         button.innerHTML = '<i class="fas fa-heart"></i>';
-        favorites.push(stationName);
+        if (!favorites.includes(stationName)) {
+            favorites.push(stationName);
+        }
+        showNotification(`${stationName} добавлена в избранное`, 'success');
     } else {
         button.innerHTML = '<i class="far fa-heart"></i>';
         favorites = favorites.filter(name => name !== stationName);
+        showNotification(`${stationName} удалена из избранного`, 'success');
     }
     
-    // Добавляем анимацию для кнопки избранного
+    // Добавляем анимацию
     button.classList.add('pulse');
-    setTimeout(() => {
-        button.classList.remove('pulse');
-    }, 500);
+    setTimeout(() => button.classList.remove('pulse'), 500);
     
+    // Сохраняем изменения
+    saveFavorites();
     saveFavoritesToTelegram();
+    
+    // Обновляем отображение если мы находимся в категории Избранное
+    if (activeCategory === "Избранное") {
+        displayRadioStations("Избранное");
+    }
 }
 
 // Кэш для проверки доступности потоков
 const streamAvailabilityCache = new Map();
 const CACHE_TIMEOUT = 60000; // 1 минута
 
-// Мониторинг состояния сети
-let isOnline = navigator.onLine;
-let networkStatusElement;
-let networkCheckInterval;
-
-function setupNetworkStatus() {
-    // Создаем элемент для отображения статуса сети
-    networkStatusElement = document.createElement('div');
-    networkStatusElement.className = 'network-status';
-    networkStatusElement.innerHTML = `
-        <i class="fas fa-wifi"></i>
-        <span>Соединение стабильное</span>
-    `;
-    document.body.appendChild(networkStatusElement);
-    
-    // Обновляем статус при изменении состояния сети
-    window.addEventListener('online', handleNetworkChange);
-    window.addEventListener('offline', handleNetworkChange);
-    
-    // Запускаем периодическую проверку состояния сети
-    networkCheckInterval = setInterval(checkNetworkState, 30000); // Проверка каждые 30 секунд
-}
-
-function checkNetworkState() {
-    if (navigator.onLine !== isOnline) {
-        handleNetworkChange();
+// Улучшенная проверка состояния сети
+async function checkNetworkState() {
+    try {
+        const response = await fetch('https://www.google.com/favicon.ico', {
+            mode: 'no-cors',
+            cache: 'no-cache'
+        });
+        return true;
+    } catch (error) {
+        return false;
     }
 }
 
 function handleNetworkChange() {
     isOnline = navigator.onLine;
     
-    if (isOnline) {
-        networkStatusElement.innerHTML = `
-            <i class="fas fa-wifi"></i>
-            <span>Соединение восстановлено</span>
-        `;
-        networkStatusElement.classList.add('online');
-        networkStatusElement.classList.add('show');
-        
-        // Если была играющая станция, пробуем восстановить воспроизведение
-        if (currentStation && elements.player.paused) {
-            setTimeout(() => {
-                playStation(currentStation, radioStations[currentStation].url);
-            }, 1000);
+    checkNetworkState().then(isConnected => {
+        if (isConnected) {
+            networkStatusElement.innerHTML = `
+                <i class="fas fa-wifi"></i>
+                <span>Соединение восстановлено</span>
+            `;
+            networkStatusElement.classList.add('online');
+            networkStatusElement.classList.add('show');
+            
+            // Если была играющая станция, пробуем восстановить воспроизведение
+            if (currentStation && elements.player.paused) {
+                setTimeout(() => {
+                    playStation(currentStation, radioStations[currentStation].url);
+                }, 1000);
+            }
+        } else {
+            networkStatusElement.innerHTML = `
+                <i class="fas fa-wifi-slash"></i>
+                <span>Нет соединения</span>
+            `;
+            networkStatusElement.classList.remove('online');
+            networkStatusElement.classList.add('show');
+            
+            // Приостанавливаем воспроизведение при потере соединения
+            if (currentStation && !elements.player.paused) {
+                elements.player.pause();
+                document.getElementById('animation-container').classList.remove('active');
+                showNotification('Потеряно соединение. Воспроизведение приостановлено.', 'error');
+            }
         }
-    } else {
-        networkStatusElement.innerHTML = `
-            <i class="fas fa-wifi-slash"></i>
-            <span>Нет соединения</span>
-        `;
-        networkStatusElement.classList.remove('online');
-        networkStatusElement.classList.add('show');
         
-        // Приостанавливаем воспроизведение при потере соединения
-        if (currentStation && !elements.player.paused) {
-            elements.player.pause();
-            document.getElementById('animation-container').classList.remove('active');
-            showNotification('Потеряно соединение. Воспроизведение приостановлено.', 'error');
-        }
-    }
+        // Скрываем статус через 3 секунды
+        setTimeout(() => {
+            networkStatusElement.classList.remove('show');
+        }, 3000);
+    });
+}
+
+// Настройка мониторинга сети
+function setupNetworkMonitoring() {
+    // Создаем элемент для отображения статуса сети
+    networkStatusElement = document.createElement('div');
+    networkStatusElement.className = 'network-status';
+    document.body.appendChild(networkStatusElement);
     
-    // Скрываем статус через 3 секунды
-    setTimeout(() => {
-        networkStatusElement.classList.remove('show');
-    }, 3000);
+    // Добавляем обработчики событий
+    window.addEventListener('online', handleNetworkChange);
+    window.addEventListener('offline', handleNetworkChange);
+    
+    // Запускаем периодическую проверку
+    networkCheckInterval = setInterval(async () => {
+        const isConnected = await checkNetworkState();
+        if (isConnected !== isOnline) {
+            handleNetworkChange();
+        }
+    }, 30000);
+    
+    // Выполняем начальную проверку
+    handleNetworkChange();
 }
 
 // Улучшенная функция проверки доступности потока

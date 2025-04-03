@@ -2,43 +2,55 @@
     /* Основные цвета */
     --primary-color: #4A90E2;
     --primary-hover: #357ABD;
-    --accent-color: #FF6F91;
-    --accent-hover: #FF5277;
+    --accent-color: #0088cc;
+    --accent-color-hover: #0099e6;
     --success-color: #2ECC71;
     --error-color: #E74C3C;
     
     /* Фоны */
     --bg-dark: #1C2526;
     --bg-card: #2E3A3D;
-    --bg-elevated: #364144;
+    --bg-elevated: #ffffff;
     
     /* Текст */
-    --text-primary: #FFFFFF;
-    --text-secondary: #B0B0B0;
+    --text-primary: #000000;
+    --text-secondary: #666666;
     --text-muted: #808080;
     
     /* Тени и эффекты */
-    --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     --button-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-    --hover-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+    --hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     
     /* Анимации */
-    --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
     --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     
     /* Размеры */
-    --border-radius-sm: 8px;
-    --border-radius-md: 12px;
-    --border-radius-lg: 16px;
+    --border-radius-sm: 4px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
     --sidebar-width: 280px;
     --player-height: 90px;
     --header-height: 64px;
+    
+    /* Кнопки */
+    --button-bg: #f5f5f5;
+    --button-text: #333333;
+    --button-hover: #eeeeee;
+    
+    /* Фоны */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+    
+    /* Граница */
+    --border-color: #e0e0e0;
 }
 
 /* Базовые стили */
 body {
-    background-color: var(--bg-dark);
+    background-color: var(--bg-primary);
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     margin: 0;
@@ -65,83 +77,89 @@ body {
 
 .radio-card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--hover-shadow);
-    background-color: var(--bg-elevated);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .radio-card.active {
-    border: 2px solid var(--primary-color);
+    border: 2px solid var(--accent-color);
 }
 
 /* Информация о станции */
 .station-info {
     flex: 1;
-    margin-right: 16px;
+    margin-right: 15px;
 }
 
 .radio-name {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
-    margin: 0 0 4px 0;
+    margin: 0 0 5px;
     color: var(--text-primary);
 }
 
 .station-details {
-    font-size: 12px;
-    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.station-details i {
+    font-size: 12px;
+}
+
+.station-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
 }
 
 /* Кнопки управления */
-.control-button {
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 50%;
+.control-button,
+.action-button {
     width: 40px;
     height: 40px;
+    border-radius: 50%;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: var(--transition-fast);
-    box-shadow: var(--button-shadow);
+    transition: all 0.3s ease;
+    background: var(--button-bg);
+    color: var(--button-text);
+}
+
+.control-button {
+    background: var(--accent-color);
+    color: white;
 }
 
 .control-button:hover {
-    background-color: var(--primary-hover);
     transform: scale(1.1);
+    background: var(--accent-color-hover);
 }
 
 .action-button {
-    background-color: transparent;
-    color: var(--text-secondary);
-    border: none;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: var(--transition-fast);
+    background: transparent;
+    border: 2px solid var(--border-color);
 }
 
 .action-button:hover {
-    color: var(--accent-color);
-    transform: scale(1.1);
+    background: var(--button-hover);
+    border-color: var(--accent-color);
 }
 
 .action-button.active {
     color: var(--accent-color);
+    border-color: var(--accent-color);
 }
 
 /* Анимации */
 @keyframes pulse {
     0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
+    50% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
 
@@ -154,7 +172,7 @@ body {
 }
 
 .pulse {
-    animation: pulse 0.3s ease-in-out;
+    animation: pulse 0.5s ease;
 }
 
 .heartbeat {
@@ -321,24 +339,25 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.5);
     display: none;
-    align-items: center;
     justify-content: center;
-    z-index: 2000;
+    align-items: center;
+    z-index: 1000;
 }
 
 .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid var(--text-secondary);
-    border-top-color: var(--primary-color);
+    border: 4px solid var(--bg-secondary);
+    border-top: 4px solid var(--accent-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* Поддержка темы Telegram */
@@ -562,64 +581,43 @@ h1 {
 
 .radio-card {
     background-color: var(--bg-elevated);
-    border-radius: 16px;
-    box-shadow: var(--card-shadow);
-    padding: 20px;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+    padding: 15px;
     display: flex;
-    flex-direction: column;
-    gap: 16px;
-    border: 2px solid transparent;
-    position: relative;
-    overflow: hidden;
-}
-
-.radio-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    transform: translateX(-100%);
-    transition: transform 0.6s ease;
-}
-
-.radio-card:hover::before {
-    transform: translateX(100%);
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
 }
 
 .radio-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .radio-card.active {
-    border-color: var(--tg-color-accent);
-    background: linear-gradient(135deg, rgba(0, 136, 204, 0.05), rgba(0, 136, 204, 0.1));
+    border: 2px solid var(--accent-color);
 }
 
 .station-info {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex: 1;
+    margin-right: 15px;
 }
 
 .radio-name {
-    font-size: var(--font-size-large);
-    font-weight: 700;
-    margin: 0;
-    color: var(--tg-theme-text-color);
-    text-shadow: var(--text-shadow);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 5px;
+    color: var(--text-primary);
 }
 
 .station-details {
-    font-size: var(--font-size-base);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
     color: var(--text-secondary);
-    margin: 8px 0;
-    text-shadow: var(--text-shadow);
 }
 
 .station-details i {
@@ -628,9 +626,8 @@ h1 {
 
 .station-controls {
     display: flex;
-    justify-content: space-between;
+    gap: 10px;
     align-items: center;
-    margin-top: auto;
 }
 
 .play-button, .favorite-button {
@@ -857,6 +854,13 @@ h1 {
         --text-primary: #ffffff;
         --text-secondary: #b3b3b3;
         --border-color: #2a2a2a;
+        --accent-color: #0088cc;
+        --accent-color-hover: #0099e6;
+        --button-bg: #3c3c3c;
+        --button-text: #ffffff;
+        --button-hover: #4c4c4c;
+        --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        --hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     
     #search-input {
@@ -1364,490 +1368,220 @@ body {
     margin: 0;
 }
 
-/* Сетка радиостанций */
+/* Основные стили для сетки радиостанций */
 .radio-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+    height: calc(100vh - 180px); /* Учитываем высоту плеера и заголовка */
 }
 
+/* Стили для карточек радиостанций */
 .radio-card {
-    background-color: var(--bg-elevated);
-    border-radius: 12px;
+    background: var(--bg-elevated);
+    border-radius: var(--border-radius-lg);
     padding: 16px;
-    transition: all 0.2s ease;
-    border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    box-shadow: var(--card-shadow);
+    cursor: pointer;
+    border: 2px solid transparent;
 }
 
 .radio-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    box-shadow: var(--hover-shadow);
+    background: var(--bg-elevated-hover);
 }
 
+.radio-card.active {
+    border-color: var(--accent-color);
+    background: var(--bg-elevated-active);
+}
+
+/* Информация о станции */
 .station-info {
-    margin-bottom: 16px;
+    flex: 1;
+    margin-right: 16px;
+    overflow: hidden;
 }
 
 .radio-name {
     font-size: 16px;
     font-weight: 600;
-    margin: 0 0 8px 0;
+    margin: 0 0 4px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .station-details {
-    font-size: 14px;
-    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
 }
 
+.station-details i {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+}
+
+/* Кнопки управления */
 .station-controls {
     display: flex;
-    justify-content: space-between;
+    gap: 12px;
     align-items: center;
 }
 
-/* Плеер */
-.player-bar {
-    background-color: var(--bg-elevated);
-    border-top: 1px solid var(--border-color);
-    padding: 0 32px;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 32px;
-}
-
-.now-playing {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.station-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--tg-color-accent), var(--tg-color-accent-hover));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 24px;
-}
-
-.player-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-}
-
-.control-button {
+.control-button,
+.action-button {
     width: 40px;
     height: 40px;
     border-radius: 50%;
     border: none;
-    background-color: var(--bg-secondary);
-    color: var(--text-primary);
-    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--button-bg);
+    color: var(--button-text);
+}
+
+.control-button {
+    background: var(--accent-color);
+    color: white;
 }
 
 .control-button:hover {
-    background-color: var(--border-color);
     transform: scale(1.05);
-}
-
-.player-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 16px;
+    background: var(--accent-color-hover);
 }
 
 .action-button {
-    background: none;
-    border: none;
+    background: transparent;
+    border: 2px solid var(--border-color);
     color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 20px;
-    padding: 8px;
-    transition: all 0.2s ease;
 }
 
 .action-button:hover {
-    color: var(--text-primary);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    transform: scale(1.05);
 }
 
-/* Анимация воспроизведения */
-#animation-container {
-    display: flex;
-    gap: 4px;
-    height: 20px;
-    align-items: center;
+.action-button.active {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
 }
 
-.animation-bar {
-    width: 3px;
-    height: 100%;
-    background-color: var(--tg-color-accent);
-    animation: soundBars 1s infinite;
-    border-radius: 2px;
-}
-
-@keyframes soundBars {
-    0% { height: 60%; }
-    50% { height: 100%; }
-    100% { height: 60%; }
-}
-
-/* Адаптивный дизайн */
-@media (max-width: 768px) {
-    .app-container {
-        grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-        display: none;
-    }
-
-    .main-content {
-        grid-column: 1 / -1;
-    }
-
-    .player-bar {
-        padding: 0 16px;
-    }
-
-    .content-section {
-        padding: 16px;
-    }
-
-    .radio-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 16px;
-    }
-}
-
-/* Приветственный экран */
-.welcome-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: var(--bg-main);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-}
-
-.welcome-content {
-    text-align: center;
-    padding: 32px;
-}
-
-.welcome-title {
-    font-size: 48px;
-    font-weight: 700;
-    margin-bottom: 24px;
-    background: linear-gradient(135deg, var(--tg-color-accent), var(--primary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.welcome-text {
-    font-size: 18px;
-    color: var(--text-secondary);
-    margin-top: 24px;
-}
-
-/* Фильтры и сортировка */
-.filters-panel {
-    background-color: var(--bg-elevated);
-    border-radius: var(--border-radius-md);
-    margin: 0 16px 16px;
-    padding: 16px;
-    display: none;
-    gap: 24px;
-}
-
-.filters-panel.show {
-    display: flex;
-}
-
-.filter-group {
-    flex: 1;
-}
-
-.filter-group h3 {
-    color: var(--text-primary);
-    font-size: 14px;
-    margin: 0 0 12px 0;
-}
-
-.filter-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-}
-
-.filter-option span {
-    color: var(--text-secondary);
-    font-size: 14px;
-}
-
-/* Настройки */
-.settings-panel {
-    margin-top: auto;
-    padding: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.settings-button {
-    width: 100%;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    padding: 12px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
-    transition: var(--transition-fast);
+/* Битрейт */
+.bitrate {
+    padding: 2px 6px;
+    background: var(--bg-secondary);
     border-radius: var(--border-radius-sm);
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
-.settings-button:hover {
-    background-color: var(--bg-elevated);
-    color: var(--text-primary);
+/* Анимации */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
 }
 
-.settings-button i {
-    width: 20px;
-    text-align: center;
+.pulse {
+    animation: pulse 0.3s ease-in-out;
 }
 
-/* Модальные окна */
-.modal {
+/* Адаптивность */
+@media (max-width: 768px) {
+    .radio-grid {
+        grid-template-columns: 1fr;
+        padding: 12px;
+        height: calc(100vh - 160px);
+    }
+
+    .radio-card {
+        padding: 12px;
+    }
+
+    .control-button,
+    .action-button {
+        width: 36px;
+        height: 36px;
+    }
+
+    .station-info {
+        margin-right: 12px;
+    }
+
+    .radio-name {
+        font-size: 14px;
+    }
+
+    .station-details {
+        font-size: 12px;
+    }
+}
+
+/* Состояния загрузки */
+.loading {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.5);
     display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--bg-secondary);
+    border-top: 4px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Нет результатов */
+.no-results {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    z-index: 2000;
-}
-
-.modal.show {
-    display: flex;
-}
-
-.modal-content {
-    background-color: var(--bg-elevated);
-    border-radius: var(--border-radius-lg);
-    padding: 24px;
-    width: 90%;
-    max-width: 400px;
-    position: relative;
-}
-
-.modal-close {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 50%;
-    transition: var(--transition-fast);
-}
-
-.modal-close:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: var(--text-primary);
-}
-
-/* Таймер сна */
-.timer-options {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin-top: 16px;
-}
-
-.timer-options button {
-    background-color: var(--bg-card);
-    border: none;
-    color: var(--text-primary);
-    padding: 12px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: var(--transition-fast);
-}
-
-.timer-options button:hover {
-    background-color: var(--primary-color);
-}
-
-/* Игра "Угадай мелодию" */
-.game-container {
-    margin-top: 16px;
-}
-
-.game-progress {
+    padding: 40px;
     text-align: center;
     color: var(--text-secondary);
+}
+
+.no-results i {
+    font-size: 48px;
     margin-bottom: 16px;
 }
 
-.game-options {
-    display: grid;
-    gap: 12px;
-}
-
-.game-option {
-    background-color: var(--bg-card);
-    border: none;
-    color: var(--text-primary);
-    padding: 16px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: var(--transition-fast);
-    text-align: left;
-}
-
-.game-option:hover {
-    background-color: var(--bg-elevated);
-}
-
-.game-option.correct {
-    background-color: var(--success-color);
-}
-
-.game-option.wrong {
-    background-color: var(--error-color);
-}
-
-/* Управление видом списка */
-.view-controls {
-    display: flex;
-    gap: 8px;
-}
-
-.view-button {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    padding: 8px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: var(--transition-fast);
-}
-
-.view-button:hover {
-    background-color: var(--bg-elevated);
-    color: var(--text-primary);
-}
-
-.view-button.active {
-    color: var(--primary-color);
-}
-
-/* Регулятор громкости */
-.volume-control {
-    position: relative;
-}
-
-.volume-slider-container {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%) translateY(10px);
-    background-color: var(--bg-elevated);
-    padding: 12px;
-    border-radius: var(--border-radius-md);
-    display: none;
-    box-shadow: var(--card-shadow);
-}
-
-.volume-control:hover .volume-slider-container {
-    display: block;
-}
-
-#volume-slider {
-    writing-mode: bt-lr;
-    -webkit-appearance: slider-vertical;
-    width: 8px;
-    height: 100px;
-}
-
-/* Сетка и список */
-.radio-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
-    padding: 16px;
-}
-
-.radio-grid.list-view {
-    display: flex;
-    flex-direction: column;
-}
-
-.radio-grid.list-view .radio-card {
-    margin-bottom: 8px;
-}
-
-/* Индикатор качества */
-.quality-indicator {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-}
-
-.quality-bar {
-    width: 3px;
-    height: 12px;
-    background-color: var(--text-secondary);
-    border-radius: 1px;
-}
-
-.quality-bar.active {
-    background-color: var(--success-color);
-}
-
-/* Рекомендации */
-.recommendations {
-    margin-top: 24px;
-}
-
-.recommendations h3 {
-    color: var(--text-primary);
-    margin: 0 0 16px 16px;
-}
-
-/* Анимации для кнопок */
-@keyframes favoriteAnimation {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.3); }
-    100% { transform: scale(1); }
-}
-
-.favorite-animation {
-    animation: favoriteAnimation 0.5s ease-in-out;
+.no-results p {
+    font-size: 16px;
+    margin: 0;
 }
 
 /* Темы оформления */
@@ -1939,17 +1673,18 @@ body.colored-theme {
     position: fixed;
     top: 20px;
     right: 20px;
-    background-color: var(--bg-elevated);
+    background: var(--error-color);
+    color: white;
     padding: 10px 20px;
-    border-radius: var(--border-radius-md);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     gap: 10px;
-    box-shadow: var(--card-shadow);
-    z-index: 1000;
     opacity: 0;
     transform: translateY(-20px);
     transition: all 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .network-status.show {
@@ -1958,17 +1693,23 @@ body.colored-theme {
 }
 
 .network-status.online {
-    color: var(--success-color);
-}
-
-.network-status:not(.online) {
-    color: var(--error-color);
+    background: var(--success-color);
 }
 
 .network-status i {
-    font-size: 18px;
+    font-size: 1.2em;
 }
 
 .network-status span {
-    font-size: 14px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .network-status {
+        top: 10px;
+        right: 10px;
+        padding: 8px 16px;
+        font-size: 0.9em;
+    }
 }

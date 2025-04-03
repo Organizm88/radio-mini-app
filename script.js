@@ -665,37 +665,45 @@ const catFrames = [
 ];
 
 // Инициализация Telegram WebApp
-let tg = null;
-
 function initTelegramWebApp() {
     try {
-        if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
-            
-            // Расширяем приложение на весь экран
-            tg.expand();
-            
-            // Получаем данные пользователя
-            const user = tg.initDataUnsafe.user;
-            if (user) {
-                console.log('Telegram user:', user);
-            }
-            
-            // Настраиваем тему
-            setupTelegramTheme();
-            
-            // Добавляем кнопку "Поделиться" в Telegram
-            setupShareButton();
-            
-            // Добавляем кнопку "Назад" в Telegram
-            setupBackButton();
-        } else {
-            console.warn('Telegram WebApp not available');
+        // Проверяем доступность Telegram WebApp
+        if (!window.Telegram || !window.Telegram.WebApp) {
+            console.warn('Telegram WebApp не доступен');
+            showNotification('Приложение запущено вне Telegram', 'warning');
+            return false;
         }
+
+        tg = window.Telegram.WebApp;
+        
+        // Проверяем инициализацию
+        if (!tg.initData || !tg.initDataUnsafe) {
+            throw new Error('Ошибка инициализации данных Telegram');
+        }
+
+        // Расширяем приложение на весь экран
+        tg.expand();
+        
+        // Получаем данные пользователя
+        const user = tg.initDataUnsafe.user;
+        if (user) {
+            console.log('Telegram user:', user);
+        }
+        
+        // Настраиваем тему
+        setupTelegramTheme();
+        
+        // Добавляем кнопку "Поделиться"
+        setupShareButton();
+        
+        // Добавляем кнопку "Назад"
+        setupBackButton();
+
+        return true;
     } catch (error) {
-        console.error('Error initializing Telegram WebApp:', error);
-        // Показываем уведомление пользователю
+        console.error('Ошибка инициализации Telegram WebApp:', error);
         showNotification('Ошибка инициализации Telegram. Некоторые функции могут быть недоступны.', 'error');
+        return false;
     }
 }
 
@@ -870,12 +878,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Настройка темы Telegram
 function setupTelegramTheme() {
-    if (window.Telegram && window.Telegram.WebApp) {
-        const tg = window.Telegram.WebApp;
-        document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor);
-        document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor);
-        document.documentElement.style.setProperty('--tg-theme-button-color', tg.buttonColor);
-        document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.buttonTextColor);
+    try {
+        if (!tg) return;
+
+        const theme = tg.themeParams || {};
+        
+        // Применяем цвета темы Telegram
+        document.documentElement.style.setProperty('--bg-primary', theme.bg_color || '#ffffff');
+        document.documentElement.style.setProperty('--text-primary', theme.text_color || '#000000');
+        document.documentElement.style.setProperty('--accent-color', theme.button_color || '#0088cc');
+        document.documentElement.style.setProperty('--button-text', theme.button_text_color || '#ffffff');
+        
+        // Добавляем класс темы
+        document.body.classList.toggle('dark-theme', theme.text_color === '#ffffff');
+    } catch (error) {
+        console.error('Ошибка настройки темы:', error);
     }
 }
 

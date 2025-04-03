@@ -1313,83 +1313,94 @@ body {
 }
 
 .main-header {
-    height: var(--header-height);
-    padding: 0 32px;
-    display: flex;
-    align-items: center;
-    background-color: var(--bg-elevated);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg-elevated);
+    padding: 16px;
     border-bottom: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .search-container {
-    position: relative;
-    width: 100%;
-    max-width: 600px;
-}
-
-.search-container i {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-secondary);
-    font-size: 16px;
+    display: flex;
+    align-items: center;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 0 12px;
 }
 
 #search-input {
-    width: 100%;
-    padding: 12px 12px 12px 40px;
-    border: none;
-    border-radius: 8px;
-    background-color: var(--bg-secondary);
-    font-size: 14px;
-    outline: none;
-    transition: all 0.2s ease;
-}
-
-#search-input:focus {
-    background-color: var(--bg-secondary);
-    box-shadow: 0 0 0 2px var(--tg-color-accent);
-}
-
-.content-section {
-    padding: 32px;
-    overflow-y: auto;
     flex: 1;
+    border: none;
+    background: none;
+    padding: 12px;
+    font-size: 14px;
+    color: var(--text-primary);
 }
 
-.section-header {
-    margin-bottom: 24px;
+#search-input::placeholder {
+    color: var(--text-secondary);
 }
 
-.section-header h2 {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 0;
+.filter-options {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.filter-options::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-option {
+    padding: 6px 12px;
+    border-radius: 16px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-color);
+}
+
+.filter-option:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent-color);
+}
+
+.filter-option.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
 }
 
 /* Основные стили для сетки радиостанций */
 .radio-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 20px;
-    padding: 20px;
+    gap: 16px;
+    padding: 16px;
     overflow-y: auto;
-    height: calc(100vh - 180px); /* Учитываем высоту плеера и заголовка */
+    height: calc(100vh - var(--header-height) - var(--player-height));
 }
 
 /* Стили для карточек радиостанций */
 .radio-card {
     background: var(--bg-elevated);
-    border-radius: var(--border-radius-lg);
-    padding: 16px;
+    border-radius: 12px;
+    padding: 12px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     box-shadow: var(--card-shadow);
     cursor: pointer;
-    border: 2px solid transparent;
 }
 
 .radio-card:hover {
@@ -1406,132 +1417,88 @@ body {
 /* Информация о станции */
 .station-info {
     flex: 1;
-    margin-right: 16px;
-    overflow: hidden;
+    min-width: 0; /* Важно для text-overflow */
+    margin-right: 12px;
 }
 
 .radio-name {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
     margin: 0 0 4px;
-    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .station-details {
+    font-size: 12px;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: var(--text-secondary);
+    gap: 6px;
 }
 
-.station-details i {
-    font-size: 14px;
-    width: 16px;
-    text-align: center;
-}
-
-/* Кнопки управления */
 .station-controls {
     display: flex;
-    gap: 12px;
-    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
-.control-button,
-.action-button {
-    width: 40px;
-    height: 40px;
+.play-button, 
+.favorite-button {
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    background: var(--button-bg);
-    color: var(--button-text);
-}
-
-.control-button {
+    transition: all 0.2s ease;
     background: var(--accent-color);
     color: white;
+    padding: 0;
 }
 
-.control-button:hover {
-    transform: scale(1.05);
-    background: var(--accent-color-hover);
-}
-
-.action-button {
+.favorite-button {
     background: transparent;
-    border: 2px solid var(--border-color);
+    border: 1px solid var(--border-color);
     color: var(--text-secondary);
 }
 
-.action-button:hover {
-    border-color: var(--accent-color);
-    color: var(--accent-color);
-    transform: scale(1.05);
+.favorite-button.active {
+    color: #e74c3c;
+    border-color: #e74c3c;
 }
 
-.action-button.active {
-    color: var(--accent-color);
-    border-color: var(--accent-color);
+/* Фильтры */
+.filter-options {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
 }
 
-/* Битрейт */
-.bitrate {
-    padding: 2px 6px;
+.filter-options::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-option {
+    padding: 8px 16px;
+    border-radius: 20px;
     background: var(--bg-secondary);
-    border-radius: var(--border-radius-sm);
-    font-size: 12px;
     color: var(--text-secondary);
+    font-size: 14px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-/* Анимации */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
-}
-
-.pulse {
-    animation: pulse 0.3s ease-in-out;
-}
-
-/* Адаптивность */
-@media (max-width: 768px) {
-    .radio-grid {
-        grid-template-columns: 1fr;
-        padding: 12px;
-        height: calc(100vh - 160px);
-    }
-
-    .radio-card {
-        padding: 12px;
-    }
-
-    .control-button,
-    .action-button {
-        width: 36px;
-        height: 36px;
-    }
-
-    .station-info {
-        margin-right: 12px;
-    }
-
-    .radio-name {
-        font-size: 14px;
-    }
-
-    .station-details {
-        font-size: 12px;
-    }
+.filter-option.active {
+    background: var(--accent-color);
+    color: white;
 }
 
 /* Состояния загрузки */

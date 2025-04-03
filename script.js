@@ -981,87 +981,79 @@ function getCategoryIcon(category) {
 
 // Оптимизированная функция отображения радиостанций
 function displayRadioStations(category = "Все") {
-    if (!elements.radioList) {
-        console.error('Radio list element not found');
-        return;
-    }
-
-    // Очищаем список
-    elements.radioList.innerHTML = "";
+    const radioList = document.getElementById('radio-list');
+    if (!radioList) return;
     
-    // Фильтруем станции
-    let stationsToDisplay = Object.entries(radioStations);
+    radioList.innerHTML = '';
     
-    // Применяем фильтры
-    if (category !== "Все") {
-        if (category === "Избранное") {
-            stationsToDisplay = stationsToDisplay.filter(([name]) => favorites.includes(name));
-        } else {
-            stationsToDisplay = stationsToDisplay.filter(([_, station]) => station.category === category);
-        }
-    }
-
-    // Проверяем наличие станций
-    if (stationsToDisplay.length === 0) {
-        elements.radioList.innerHTML = `
-            <div class="no-results">
-                <i class="fas fa-broadcast-tower"></i>
-                <p>Станции не найдены</p>
-            </div>
-        `;
-        return;
-    }
-
     // Создаем фрагмент для оптимизации производительности
     const fragment = document.createDocumentFragment();
-
-    // Отображаем станции
-    stationsToDisplay.forEach(([name, station]) => {
+    
+    // Фильтруем станции по категории
+    const stations = Object.entries(radioStations).filter(([name, station]) => {
+        if (category === "Все") return true;
+        if (category === "Избранное") return favorites.includes(name);
+        return station.category === category;
+    });
+    
+    if (stations.length === 0) {
+        const noResults = document.createElement('div');
+        noResults.className = 'no-results';
+        noResults.innerHTML = `
+            <i class="fas fa-broadcast-tower"></i>
+            <p>Станции не найдены</p>
+        `;
+        radioList.appendChild(noResults);
+        return;
+    }
+    
+    stations.forEach(([name, station]) => {
         const card = document.createElement('div');
-        card.className = `radio-card${currentStation === name ? ' active' : ''}`;
+        card.className = 'radio-card';
+        if (currentStation === name) {
+            card.classList.add('active');
+        }
         
         card.innerHTML = `
             <div class="station-info">
-                <p class="radio-name">${name}</p>
-                <p class="station-details">
-                    <i class="fas ${station.icon}"></i>
+                <h3 class="radio-name">${name}</h3>
+                <div class="station-details">
+                    <i class="fas fa-music"></i>
                     <span>${getCategoryName(station.category)}</span>
-                    <span class="bitrate">${station.bitrate}</span>
-                </p>
+                    ${station.bitrate ? `<span>${station.bitrate} kbps</span>` : ''}
+                </div>
             </div>
             <div class="station-controls">
-                <button class="control-button" aria-label="Воспроизвести">
+                <button class="play-button" aria-label="Воспроизвести">
                     <i class="fas ${currentStation === name ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
-                <button class="action-button${favorites.includes(name) ? ' active' : ''}" aria-label="Добавить в избранное">
-                    <i class="${favorites.includes(name) ? 'fas' : 'far'} fa-heart"></i>
+                <button class="favorite-button ${favorites.includes(name) ? 'active' : ''}" aria-label="Добавить в избранное">
+                    <i class="fas fa-heart"></i>
                 </button>
             </div>
         `;
-
+        
         // Добавляем обработчики событий
-        const playButton = card.querySelector('.control-button');
-        const favoriteButton = card.querySelector('.action-button');
-
+        const playButton = card.querySelector('.play-button');
         playButton.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (name === currentStation) {
+            if (currentStation === name) {
                 togglePlayPause();
             } else {
                 playStation(name, station.url);
             }
         });
-
+        
+        const favoriteButton = card.querySelector('.favorite-button');
         favoriteButton.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleFavorite(favoriteButton, name);
         });
-
+        
         fragment.appendChild(card);
     });
-
-    // Добавляем все карточки одним действием
-    elements.radioList.appendChild(fragment);
+    
+    radioList.appendChild(fragment);
 }
 
 // Проверка поддержки аудио форматов
@@ -1188,7 +1180,7 @@ async function playStation(name, url) {
 // Обновление состояния кнопок плеера
 function updatePlayerButtons() {
     document.querySelectorAll('.radio-card').forEach(card => {
-        const playButton = card.querySelector('.control-button');
+        const playButton = card.querySelector('.play-button');
         if (card.querySelector('.radio-name').textContent === currentStation) {
             card.classList.add('active');
             playButton.innerHTML = '<i class="fas fa-pause"></i>';
@@ -1217,7 +1209,7 @@ function togglePlayPause() {
     // Обновляем состояние кнопок на карточках
     document.querySelectorAll('.radio-card').forEach(card => {
         if (card.classList.contains('active')) {
-            const playButton = card.querySelector('.control-button');
+            const playButton = card.querySelector('.play-button');
             playButton.innerHTML = elements.player.paused ? 
                 '<i class="fas fa-play"></i>' : 
                 '<i class="fas fa-pause"></i>';

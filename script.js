@@ -615,20 +615,26 @@ const radioStations = {
     }
 };
 
-// Оптимизация кэширования DOM-элементов
+// Кэширование DOM элементов
 const elements = {
-    radioList: document.getElementById("radio-list"),
-    player: document.getElementById("player"),
-    searchInput: document.getElementById("search-input"),
-    currentStationEl: document.getElementById("current-station"),
-    loadingIndicator: document.getElementById("loading"),
-    favoriteButton: document.getElementById("favorite-button"),
-    animationContainer: document.getElementById("animation-container"),
-    playPauseButton: document.getElementById("play-pause"),
-    welcomeScreen: document.getElementById('welcome-screen'),
-    asciiCat: document.getElementById('ascii-cat'),
-    categoriesList: document.getElementById('categories-list'),
-    currentCategory: document.getElementById('current-category')
+    sidebar: document.querySelector('.sidebar'),
+    mainContent: document.querySelector('.main-content'),
+    radioGrid: document.querySelector('.radio-grid'),
+    playerBar: document.querySelector('.player-bar'),
+    audioPlayer: document.querySelector('#audio-player'),
+    searchInput: document.querySelector('#search-input'),
+    filterButton: document.querySelector('.filter-button'),
+    filtersPanel: document.querySelector('.filters-panel'),
+    viewControls: document.querySelector('.view-controls'),
+    volumeControl: document.querySelector('.volume-control'),
+    volumeSlider: document.querySelector('#volume-slider'),
+    settingsButton: document.querySelector('.settings-button'),
+    themeToggle: document.querySelector('.theme-toggle'),
+    shareButton: document.querySelector('.share-button'),
+    sleepTimerButton: document.querySelector('.sleep-timer-button'),
+    sleepTimerModal: document.querySelector('.sleep-timer-modal'),
+    timerOptions: document.querySelector('.timer-options'),
+    modalCloseButtons: document.querySelectorAll('.modal-close')
 };
 
 // Переменные состояния
@@ -664,28 +670,34 @@ const catFrames = [
 let tg = null;
 
 function initTelegramWebApp() {
-    if (window.Telegram && window.Telegram.WebApp) {
-        tg = window.Telegram.WebApp;
-        
-        // Расширяем приложение на весь экран
-        tg.expand();
-        
-        // Получаем данные пользователя
-        const user = tg.initDataUnsafe.user;
-        if (user) {
-            console.log('Telegram user:', user);
-            // Можно использовать данные пользователя для персонализации
-            // user.id, user.first_name, user.last_name, user.username, user.language_code, user.start_param
+    try {
+        if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
+            
+            // Расширяем приложение на весь экран
+            tg.expand();
+            
+            // Получаем данные пользователя
+            const user = tg.initDataUnsafe.user;
+            if (user) {
+                console.log('Telegram user:', user);
+            }
+            
+            // Настраиваем тему
+            setupTelegramTheme();
+            
+            // Добавляем кнопку "Поделиться" в Telegram
+            setupShareButton();
+            
+            // Добавляем кнопку "Назад" в Telegram
+            setupBackButton();
+        } else {
+            console.warn('Telegram WebApp not available');
         }
-        
-        // Настраиваем тему
-        setupTelegramTheme();
-        
-        // Добавляем кнопку "Поделиться" в Telegram
-        setupShareButton();
-        
-        // Добавляем кнопку "Назад" в Telegram
-        setupBackButton();
+    } catch (error) {
+        console.error('Error initializing Telegram WebApp:', error);
+        // Показываем уведомление пользователю
+        showNotification('Ошибка инициализации Telegram. Некоторые функции могут быть недоступны.', 'error');
     }
 }
 
@@ -1039,56 +1051,114 @@ function createRadioCard(name, station, container = elements.radioList) {
     container.appendChild(card);
 }
 
-// Обновляем функцию воспроизведения
+// Проверка поддержки аудио форматов
+function checkAudioSupport() {
+    const audio = document.createElement('audio');
+    const formats = {
+        mp3: audio.canPlayType('audio/mpeg'),
+        aac: audio.canPlayType('audio/aac'),
+        ogg: audio.canPlayType('audio/ogg'),
+        wav: audio.canPlayType('audio/wav')
+    };
+    
+    // Определяем предпочтительный формат
+    const preferredFormat = Object.entries(formats).find(([_, support]) => 
+        support === 'probably' || support === 'maybe'
+    );
+    
+    if (!preferredFormat) {
+        showNotification('Ваш браузер может не поддерживать некоторые форматы аудио.', 'warning');
+        return null;
+    }
+    
+    return preferredFormat[0];
+}
+
+// Обновляем функцию воспроизведения с учетом поддержки форматов
 async function playStation(name, url) {
     try {
-        elements.loadingIndicator.style.display = 'flex';
-        
-        const isAvailable = await checkStreamAvailability(url);
-        if (!isAvailable) {
-            sendNotificationToTelegram(`Станция ${name} временно недоступна. Попробуйте позже.`);
-            return;
+        if (!name || !url) {
+            throw new Error('Не указано имя или URL станции');
         }
 
+        elements.loadingIndicator.style.display = 'flex';
+        
+        // Проверяем поддержку форматов
+        const supportedFormat = checkAudioSupport();
+        if (!supportedFormat) {
+            throw new Error('Неподдерживаемый формат аудио');
+        }
+        
+        // Проверяем доступность потока
+        const isAvailable = await checkStreamAvailability(url);
+        if (!isAvailable) {
+            throw new Error('Станция временно недоступна');
+        }
+
+        // Создаем новый экземпляр Audio
         const audio = new Audio();
         audio.src = url;
         
-        await new Promise((resolve, reject) => {
-            audio.addEventListener('canplaythrough', resolve, { once: true });
-            audio.addEventListener('error', reject, { once: true });
-        });
-
-        elements.player.src = url;
-        elements.player.play();
-        
-        currentStation = name;
-        elements.currentStationEl.textContent = name;
-        
-        // Обновляем состояние кнопок
-        document.querySelectorAll('.radio-card').forEach(card => {
-            const playButton = card.querySelector('.control-button');
-            if (card.querySelector('.radio-name').textContent === name) {
-                card.classList.add('active');
-                playButton.innerHTML = '<i class="fas fa-pause"></i>';
-            } else {
-                card.classList.remove('active');
-                playButton.innerHTML = '<i class="fas fa-play"></i>';
+        // Добавляем обработчики событий для аудио
+        audio.addEventListener('canplaythrough', () => {
+            try {
+                elements.player.src = url;
+                elements.player.play();
+                
+                currentStation = name;
+                elements.currentStationEl.textContent = name;
+                
+                // Обновляем состояние кнопок
+                document.querySelectorAll('.radio-card').forEach(card => {
+                    const playButton = card.querySelector('.control-button');
+                    if (card.querySelector('.radio-name').textContent === name) {
+                        card.classList.add('active');
+                        playButton.innerHTML = '<i class="fas fa-pause"></i>';
+                    } else {
+                        card.classList.remove('active');
+                        playButton.innerHTML = '<i class="fas fa-play"></i>';
+                    }
+                });
+                
+                // Показываем анимацию воспроизведения
+                document.getElementById('animation-container').classList.add('active');
+                
+                // Отправляем уведомление в Telegram
+                sendNotificationToTelegram(`Сейчас играет: ${name}`);
+                
+                // Сохраняем настройки
+                saveSettingsToTelegram({
+                    lastStation: name,
+                    volume: elements.player.volume
+                });
+            } catch (error) {
+                console.error('Error in canplaythrough handler:', error);
+                throw error;
             }
         });
         
-        // Показываем анимацию воспроизведения
-        document.getElementById('animation-container').classList.add('active');
-        
-        // Отправляем уведомление в Telegram
-        sendNotificationToTelegram(`Сейчас играет: ${name}`);
-        
-        saveSettingsToTelegram({
-            lastStation: name,
-            volume: elements.player.volume
+        audio.addEventListener('error', (error) => {
+            console.error('Error playing station:', error);
+            throw new Error('Ошибка воспроизведения');
         });
+
+        // Добавляем таймаут для загрузки
+        const loadTimeout = setTimeout(() => {
+            if (elements.loadingIndicator.style.display === 'flex') {
+                throw new Error('Превышено время ожидания загрузки');
+            }
+        }, 10000);
+
+        // Очищаем таймаут при успешной загрузке
+        audio.addEventListener('canplay', () => {
+            clearTimeout(loadTimeout);
+        });
+        
     } catch (error) {
         console.error('Error playing station:', error);
-        sendNotificationToTelegram(`Ошибка воспроизведения ${name}. Попробуйте позже.`);
+        showNotification(error.message || `Ошибка воспроизведения ${name}. Попробуйте позже.`, 'error');
+        elements.loadingIndicator.style.display = 'none';
+        document.getElementById('animation-container').classList.remove('active');
     } finally {
         elements.loadingIndicator.style.display = 'none';
     }
@@ -1147,6 +1217,74 @@ function toggleFavorite(button) {
 const streamAvailabilityCache = new Map();
 const CACHE_TIMEOUT = 60000; // 1 минута
 
+// Мониторинг состояния сети
+let isOnline = navigator.onLine;
+let networkStatusElement;
+let networkCheckInterval;
+
+function setupNetworkStatus() {
+    // Создаем элемент для отображения статуса сети
+    networkStatusElement = document.createElement('div');
+    networkStatusElement.className = 'network-status';
+    networkStatusElement.innerHTML = `
+        <i class="fas fa-wifi"></i>
+        <span>Соединение стабильное</span>
+    `;
+    document.body.appendChild(networkStatusElement);
+    
+    // Обновляем статус при изменении состояния сети
+    window.addEventListener('online', handleNetworkChange);
+    window.addEventListener('offline', handleNetworkChange);
+    
+    // Запускаем периодическую проверку состояния сети
+    networkCheckInterval = setInterval(checkNetworkState, 30000); // Проверка каждые 30 секунд
+}
+
+function checkNetworkState() {
+    if (navigator.onLine !== isOnline) {
+        handleNetworkChange();
+    }
+}
+
+function handleNetworkChange() {
+    isOnline = navigator.onLine;
+    
+    if (isOnline) {
+        networkStatusElement.innerHTML = `
+            <i class="fas fa-wifi"></i>
+            <span>Соединение восстановлено</span>
+        `;
+        networkStatusElement.classList.add('online');
+        networkStatusElement.classList.add('show');
+        
+        // Если была играющая станция, пробуем восстановить воспроизведение
+        if (currentStation && elements.player.paused) {
+            setTimeout(() => {
+                playStation(currentStation, radioStations[currentStation].url);
+            }, 1000);
+        }
+    } else {
+        networkStatusElement.innerHTML = `
+            <i class="fas fa-wifi-slash"></i>
+            <span>Нет соединения</span>
+        `;
+        networkStatusElement.classList.remove('online');
+        networkStatusElement.classList.add('show');
+        
+        // Приостанавливаем воспроизведение при потере соединения
+        if (currentStation && !elements.player.paused) {
+            elements.player.pause();
+            document.getElementById('animation-container').classList.remove('active');
+            showNotification('Потеряно соединение. Воспроизведение приостановлено.', 'error');
+        }
+    }
+    
+    // Скрываем статус через 3 секунды
+    setTimeout(() => {
+        networkStatusElement.classList.remove('show');
+    }, 3000);
+}
+
 // Улучшенная функция проверки доступности потока
 async function checkStreamAvailability(url) {
     // Проверяем кэш
@@ -1161,7 +1299,10 @@ async function checkStreamAvailability(url) {
 
         const response = await fetch(url, { 
             method: 'HEAD',
-            signal: controller.signal
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; RadioToTBot/1.0;)'
+            }
         });
 
         clearTimeout(timeoutId);
@@ -1178,11 +1319,29 @@ async function checkStreamAvailability(url) {
     } catch (error) {
         console.error('Ошибка проверки потока:', error);
         
+        // В случае ошибки сети проверяем состояние соединения
+        if (!navigator.onLine) {
+            throw new Error('Нет подключения к интернету');
+        }
+        
         // В случае ошибки считаем поток доступным, 
         // так как некоторые станции могут блокировать HEAD-запросы
         return true;
     }
 }
+
+// Очистка ресурсов при выгрузке страницы
+window.addEventListener('beforeunload', () => {
+    if (networkCheckInterval) {
+        clearInterval(networkCheckInterval);
+    }
+    if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+    }
+    if (sleepTimeout) {
+        clearTimeout(sleepTimeout);
+    }
+});
 
 // Оптимизация поиска
 const debouncedSearch = debounce((searchTerm) => {
@@ -1452,56 +1611,175 @@ function handleSwipe() {
     }
 }
 
-// Обработка ошибок воспроизведения
-elements.player.addEventListener('error', async (e) => {
-    console.error('Player error:', e);
-    
-    if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        sendNotificationToTelegram(`Ошибка воспроизведения. Попытка ${retryCount} из ${MAX_RETRIES}...`);
-        
-        // Пауза перед повторной попыткой
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Пробуем воспроизвести текущую станцию снова
-        if (currentStation) {
-            playStation(currentStation, radioStations[currentStation].url);
-        }
-    } else {
-        retryCount = 0;
-        sendNotificationToTelegram('Не удалось восстановить воспроизведение. Попробуйте другую станцию.');
-        elements.loadingIndicator.style.display = 'none';
-    }
-});
-
 // Обработка состояний загрузки
+let loadingTimeout;
+
 elements.player.addEventListener('waiting', () => {
     elements.loadingIndicator.style.display = 'flex';
     document.getElementById('animation-container').classList.remove('active');
+    
+    // Устанавливаем таймаут для загрузки
+    loadingTimeout = setTimeout(() => {
+        if (elements.loadingIndicator.style.display === 'flex') {
+            elements.loadingIndicator.style.display = 'none';
+            showNotification('Превышено время ожидания загрузки. Попробуйте еще раз.', 'error');
+            retryCount++;
+            if (retryCount >= MAX_RETRIES) {
+                showNotification('Не удалось загрузить станцию. Попробуйте другую.', 'error');
+            }
+        }
+    }, 10000); // 10 секунд таймаут
 });
 
 elements.player.addEventListener('playing', () => {
+    clearTimeout(loadingTimeout);
     elements.loadingIndicator.style.display = 'none';
     document.getElementById('animation-container').classList.add('active');
     retryCount = 0; // Сбрасываем счетчик попыток при успешном воспроизведении
 });
 
 elements.player.addEventListener('canplay', () => {
+    clearTimeout(loadingTimeout);
     elements.loadingIndicator.style.display = 'none';
 });
 
-// Обработка потери соединения
-window.addEventListener('online', () => {
-    if (currentStation && elements.player.paused) {
-        sendNotificationToTelegram('Соединение восстановлено. Возобновляем воспроизведение...');
-        playStation(currentStation, radioStations[currentStation].url);
-    }
-});
+// Настройка обработчиков событий
+function setupEventListeners() {
+    // Поиск с debounce
+    elements.searchInput.addEventListener('input', debounce(handleSearch, 300));
 
-window.addEventListener('offline', () => {
-    if (currentStation && !elements.player.paused) {
-        sendNotificationToTelegram('Потеряно соединение. Воспроизведение приостановлено.');
-        elements.player.pause();
-        document.getElementById('animation-container').classList.remove('active');
+    // Фильтры
+    elements.filterButton.addEventListener('click', toggleFilters);
+    document.querySelectorAll('.filter-option').forEach(option => {
+        option.addEventListener('click', handleFilterChange);
+    });
+
+    // Управление видом
+    elements.viewControls.addEventListener('click', handleViewChange);
+
+    // Громкость
+    elements.volumeSlider.addEventListener('input', handleVolumeChange);
+
+    // Настройки
+    elements.settingsButton.addEventListener('click', toggleSettings);
+    elements.themeToggle.addEventListener('click', toggleTheme);
+    elements.shareButton.addEventListener('click', shareApp);
+    elements.sleepTimerButton.addEventListener('click', showSleepTimer);
+
+    // Модальные окна
+    elements.modalCloseButtons.forEach(button => {
+        button.addEventListener('click', closeModal);
+    });
+
+    // Таймер сна
+    elements.timerOptions.addEventListener('click', handleTimerOption);
+}
+
+// Обработка поиска
+function handleSearch(event) {
+    const searchTerm = event.target.value.toLowerCase();
+    const filteredStations = Object.entries(radioStations).filter(([name]) => 
+        name.toLowerCase().includes(searchTerm)
+    );
+    renderRadioStations(filteredStations);
+}
+
+// Переключение фильтров
+function toggleFilters() {
+    elements.filtersPanel.classList.toggle('show');
+}
+
+// Обработка изменения фильтра
+function handleFilterChange(event) {
+    const filter = event.currentTarget.dataset.filter;
+    const value = event.currentTarget.dataset.value;
+    
+    // Обновление состояния фильтра
+    event.currentTarget.classList.toggle('active');
+    
+    // Применение фильтра
+    applyFilters();
+}
+
+// Применение фильтров
+function applyFilters() {
+    const activeFilters = document.querySelectorAll('.filter-option.active');
+    let filteredStations = Object.entries(radioStations);
+
+    activeFilters.forEach(filter => {
+        const filterType = filter.dataset.filter;
+        const filterValue = filter.dataset.value;
+
+        filteredStations = filteredStations.filter(([name, station]) => {
+            switch (filterType) {
+                case 'quality':
+                    return station.bitrate === filterValue;
+                case 'category':
+                    return station.category === filterValue;
+                default:
+                    return true;
+            }
+        });
+    });
+
+    renderRadioStations(filteredStations);
+}
+
+// Переключение вида списка
+function handleViewChange(event) {
+    if (event.target.classList.contains('view-button')) {
+        const view = event.target.dataset.view;
+        elements.radioGrid.className = `radio-grid ${view}-view`;
+        
+        // Обновление активной кнопки
+        elements.viewControls.querySelectorAll('.view-button').forEach(button => {
+            button.classList.remove('active');
+        });
+        event.target.classList.add('active');
     }
-});
+}
+
+// Обработка изменения громкости
+function handleVolumeChange(event) {
+    const volume = event.target.value / 100;
+    elements.audioPlayer.volume = volume;
+    saveSettingsToTelegram({ volume });
+}
+
+// Переключение настроек
+function toggleSettings() {
+    elements.sidebar.classList.toggle('show');
+}
+
+// Переключение темы
+function toggleTheme() {
+    document.body.classList.toggle('light-theme');
+    document.body.classList.toggle('colored-theme');
+    saveSettingsToTelegram({ theme: document.body.className });
+}
+
+// Поделиться приложением
+function shareApp() {
+    if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.share();
+    }
+}
+
+// Показать таймер сна
+function showSleepTimer() {
+    elements.sleepTimerModal.classList.add('show');
+}
+
+// Обработка выбора таймера
+function handleTimerOption(event) {
+    if (event.target.classList.contains('timer-option')) {
+        const minutes = parseInt(event.target.dataset.minutes);
+        setSleepTimer(minutes);
+        closeModal(elements.sleepTimerModal);
+    }
+}
+
+// Закрытие модального окна
+function closeModal(modal) {
+    modal.classList.remove('show');
+}

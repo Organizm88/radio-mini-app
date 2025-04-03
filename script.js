@@ -37,10 +37,10 @@ const radioStations = {
         bitrate: "128kbps"
     },
     "Ретро FM": { 
-        url: "https://emgregion.hostingradio.ru:8064/moscow.retro.mp3", 
+        url: "http://retro.radiorecord.ru:8102/sd90_320", 
         category: "Шансон и Ретро",
         icon: "fa-clock",
-        bitrate: "128kbps"
+        bitrate: "320kbps"
     },
     "Comedy Radio": { 
         url: "https://pub0302.101.ru:8443/stream/air/aac/64/202", 
@@ -82,6 +82,54 @@ const radioStations = {
         url: "https://stream.radiozenit.ru:8443/zenit", 
         category: "Спорт",
         icon: "fa-futbol",
+        bitrate: "128kbps"
+    },
+    "BBC Radio 1": { 
+        url: "http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio1_mf_p", 
+        category: "Международные",
+        icon: "fa-globe",
+        bitrate: "128kbps"
+    },
+    "KEXP": { 
+        url: "https://kexp-mp3-128.streamguys1.com/kexp128.mp3", 
+        category: "Международные",
+        icon: "fa-globe",
+        bitrate: "128kbps"
+    },
+    "Radio Paradise": { 
+        url: "https://stream.radioparadise.com/flacm", 
+        category: "Международные",
+        icon: "fa-globe",
+        bitrate: "FLAC"
+    },
+    "Эхо Москвы": { 
+        url: "http://emgspb.hostingradio.ru:8000/emgspb128.mp3", 
+        category: "Новости",
+        icon: "fa-newspaper",
+        bitrate: "128kbps"
+    },
+    "Коммерсантъ FM": { 
+        url: "http://kommersant77.hostingradio.ru:8016/kommersant128.mp3", 
+        category: "Новости",
+        icon: "fa-newspaper",
+        bitrate: "128kbps"
+    },
+    "Вести FM": { 
+        url: "http://icecast.vgtrk.cdnvideo.ru:8000/vestifm_mp3_192kbps", 
+        category: "Новости",
+        icon: "fa-newspaper",
+        bitrate: "192kbps"
+    },
+    "SomaFM Dronezone": { 
+        url: "https://somafm.com/dronezone.pls", 
+        category: "Экспериментальные",
+        icon: "fa-music",
+        bitrate: "128kbps"
+    },
+    "NTS Radio": { 
+        url: "https://stream-relay-geo.ntslive.net/stream", 
+        category: "Экспериментальные",
+        icon: "fa-music",
         bitrate: "128kbps"
     }
 };
@@ -215,7 +263,10 @@ function getCategoryIcon(category) {
         "Разговорные": "fa-microphone",
         "Информационные": "fa-newspaper",
         "Релакс": "fa-spa",
-        "Спорт": "fa-futbol"
+        "Спорт": "fa-futbol",
+        "Международные": "fa-globe",
+        "Новости": "fa-newspaper",
+        "Экспериментальные": "fa-music"
     };
     return icons[category] || "fa-music";
 }
@@ -336,14 +387,18 @@ function playStation(name, url) {
     retryCount = 0;
     
     // Добавляем обработчик ошибок
-    player.onerror = () => {
+    player.onerror = (e) => {
         loadingIndicator.classList.add("hidden");
+        console.error("Ошибка воспроизведения:", e);
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             showNotification(`Ошибка воспроизведения. Попытка ${retryCount} из ${MAX_RETRIES}...`);
             setTimeout(() => {
                 player.src = url;
-                player.play();
+                player.play().catch(error => {
+                    console.error("Ошибка при повторной попытке:", error);
+                    showNotification("Не удалось воспроизвести станцию. Попробуйте позже.", "error");
+                });
             }, 3000);
         } else {
             showNotification("Не удалось воспроизвести станцию. Попробуйте позже.", "error");
@@ -367,7 +422,8 @@ function playStation(name, url) {
         });
 
         loadingIndicator.classList.add("hidden");
-    }).catch(() => {
+    }).catch((error) => {
+        console.error("Ошибка воспроизведения:", error);
         loadingIndicator.classList.add("hidden");
         showNotification("Ошибка воспроизведения станции", "error");
     });
@@ -378,39 +434,46 @@ function updateCurrentStationDisplay() {
     currentStationEl.textContent = `Сейчас играет: ${currentStation || "не выбрано"}`;
 }
 
-// Таймер сна
+// Добавляем обработчик для таймера сна
+document.getElementById("sleep-timer").addEventListener("change", (e) => {
+    const minutes = parseInt(e.target.value);
+    if (minutes > 0 && minutes <= 120) {
+        setSleepTimer(minutes);
+    }
+});
+
+// Улучшаем функцию таймера сна
 function setSleepTimer(minutes) {
-    if (sleepTimeout) clearTimeout(sleepTimeout);
+    if (sleepTimeout) {
+        clearTimeout(sleepTimeout);
+        showNotification("Таймер сна отменен");
+    }
+    
     if (minutes > 0) {
         sleepTimeout = setTimeout(() => {
             player.pause();
-            alert("Таймер сна: воспроизведение остановлено");
+            showNotification("Таймер сна: воспроизведение остановлено");
+            document.getElementById("sleep-timer").value = "";
         }, minutes * 60000);
-        alert(`Таймер сна установлен на ${minutes} минут`);
+        showNotification(`Таймер сна установлен на ${minutes} минут`);
     }
 }
 
 // Настройка управления громкостью
 function setupVolumeControl() {
-    const volumeSlider = document.createElement("input");
-    volumeSlider.type = "range";
-    volumeSlider.min = "0";
-    volumeSlider.max = "1";
-    volumeSlider.step = "0.1";
+    const volumeSlider = document.querySelector(".volume-slider");
+    const volumeIcon = document.querySelector(".volume-control i");
+    
+    // Установка начального значения громкости
     volumeSlider.value = player.volume;
-    volumeSlider.className = "volume-slider";
+    updateVolumeIcon(player.volume);
     
-    const volumeContainer = document.createElement("div");
-    volumeContainer.className = "volume-control";
-    volumeContainer.innerHTML = '<i class="fas fa-volume-up"></i>';
-    volumeContainer.appendChild(volumeSlider);
-    
-    document.querySelector(".player-container").insertBefore(volumeContainer, player);
-    
+    // Обработчик изменения громкости
     volumeSlider.addEventListener("input", (e) => {
-        player.volume = e.target.value;
-        lastVolume = e.target.value;
-        updateVolumeIcon(e.target.value);
+        const volume = parseFloat(e.target.value);
+        player.volume = volume;
+        lastVolume = volume;
+        updateVolumeIcon(volume);
         saveVolume();
     });
 }
@@ -418,7 +481,7 @@ function setupVolumeControl() {
 // Обновление иконки громкости
 function updateVolumeIcon(volume) {
     const icon = document.querySelector(".volume-control i");
-    if (volume == 0) {
+    if (volume === 0) {
         icon.className = "fas fa-volume-mute";
     } else if (volume < 0.5) {
         icon.className = "fas fa-volume-down";
@@ -429,12 +492,18 @@ function updateVolumeIcon(volume) {
 
 // Переключение режима без звука
 function toggleMute() {
+    const volumeSlider = document.querySelector(".volume-slider");
     isMuted = !isMuted;
+    
     if (isMuted) {
+        lastVolume = player.volume;
         player.volume = 0;
+        volumeSlider.value = 0;
     } else {
         player.volume = lastVolume;
+        volumeSlider.value = lastVolume;
     }
+    
     updateVolumeIcon(player.volume);
     saveVolume();
 }

@@ -34,6 +34,14 @@
                     <i id="favorite-button" class="far fa-heart"></i>
                 </div>
             </div>
+            <div class="volume-control">
+                <i class="fas fa-volume-up"></i>
+                <input type="range" class="volume-slider" min="0" max="1" step="0.1" value="1">
+            </div>
+            <div class="sleep-timer-control">
+                <i class="fas fa-moon"></i>
+                <input type="number" id="sleep-timer" min="1" max="120" placeholder="мин">
+            </div>
             <audio id="player" controls></audio>
         </div>
 

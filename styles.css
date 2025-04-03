@@ -130,6 +130,121 @@ audio {
     outline: none;
 }
 
+/* Управление громкостью */
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.volume-control i {
+    font-size: 18px;
+    color: var(--tg-color-accent, #0088cc);
+    cursor: pointer;
+}
+
+.volume-slider {
+    flex-grow: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    background: #ddd;
+    border-radius: 2px;
+    outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--tg-color-accent, #0088cc);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: var(--tg-transition);
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* Улучшенные карточки радиостанций */
+.radio-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: var(--tg-box-shadow);
+    transition: var(--tg-transition);
+    cursor: pointer;
+}
+
+.radio-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.radio-card.active {
+    border: 2px solid var(--tg-color-accent, #0088cc);
+}
+
+.radio-icon {
+    width: 40px;
+    height: 40px;
+    background-color: var(--tg-color-accent, #0088cc);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 16px;
+    font-size: 16px;
+}
+
+.radio-name {
+    font-weight: bold;
+    margin: 0 0 4px 0;
+    font-size: 16px;
+}
+
+.station-details {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.station-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.play-button, .favorite-button {
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    color: var(--tg-color-accent, #0088cc);
+    transition: var(--tg-transition);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.play-button:hover, .favorite-button:hover {
+    background: rgba(0, 136, 204, 0.1);
+}
+
+.favorite-button {
+    color: #e74c3c;
+}
+
+.favorite-button:hover {
+    background: rgba(231, 76, 60, 0.1);
+}
+
 /* Анимация воспроизведения */
 #animation-container {
     display: flex;
@@ -162,25 +277,11 @@ audio {
     }
 }
 
-.animation-bar:nth-child(1) {
-    animation-duration: 474ms;
-}
-
-.animation-bar:nth-child(2) {
-    animation-duration: 433ms;
-}
-
-.animation-bar:nth-child(3) {
-    animation-duration: 407ms;
-}
-
-.animation-bar:nth-child(4) {
-    animation-duration: 458ms;
-}
-
-.animation-bar:nth-child(5) {
-    animation-duration: 400ms;
-}
+.animation-bar:nth-child(1) { animation-duration: 474ms; }
+.animation-bar:nth-child(2) { animation-duration: 433ms; }
+.animation-bar:nth-child(3) { animation-duration: 407ms; }
+.animation-bar:nth-child(4) { animation-duration: 458ms; }
+.animation-bar:nth-child(5) { animation-duration: 400ms; }
 
 /* Категории */
 .categories-container {
@@ -218,65 +319,6 @@ audio {
     background-color: var(--tg-color-accent, #0088cc);
     color: #fff;
     border-color: var(--tg-color-accent, #0088cc);
-}
-
-/* Список радиостанций */
-.radio-container {
-    margin-bottom: 16px;
-}
-
-.radio-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 16px;
-}
-
-.radio-card {
-    background-color: #fff;
-    border-radius: 12px;
-    box-shadow: var(--tg-box-shadow);
-    padding: 16px;
-    cursor: pointer;
-    transition: var(--tg-transition);
-    display: flex;
-    align-items: center;
-    position: relative;
-}
-
-.radio-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.radio-card.active {
-    border: 2px solid var(--tg-color-accent, #0088cc);
-}
-
-.radio-icon {
-    width: 40px;
-    height: 40px;
-    background-color: var(--tg-color-accent, #0088cc);
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-right: 16px;
-    font-size: 16px;
-}
-
-.radio-name {
-    font-weight: bold;
-    flex-grow: 1;
-    margin: 0;
-}
-
-.favorite-indicator {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    color: #e74c3c;
-    font-size: 14px;
 }
 
 /* Индикатор загрузки */
@@ -348,5 +390,17 @@ audio {
     
     .category-tab {
         border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .station-details {
+        color: #aaa;
+    }
+    
+    .volume-slider {
+        background: #444;
+    }
+    
+    .play-button:hover, .favorite-button:hover {
+        background: rgba(255, 255, 255, 0.1);
     }
 }

@@ -23,6 +23,8 @@ const searchInput = document.getElementById("search-input");
 const categoriesTabs = document.getElementById("categories-tabs");
 const currentStationEl = document.getElementById("current-station");
 const loadingIndicator = document.getElementById("loading");
+const favoriteButton = document.getElementById("favorite-button");
+const animationContainer = document.getElementById("animation-container");
 const sleepTimerInput = document.getElementById("sleep-timer");
 const randomButton = document.getElementById("random-button");
 
@@ -31,6 +33,8 @@ let currentStation = "";
 let favorites = [];
 let activeCategory = "Все";
 let sleepTimeout = null;
+let lastVolume = 1;
+let isMuted = false;
 
 // Инициализация приложения
 document.addEventListener("DOMContentLoaded", () => {
@@ -38,6 +42,8 @@ document.addEventListener("DOMContentLoaded", () => {
     loadLastStation();
     createCategories();
     displayRadioStations(activeCategory);
+    setupKeyboardShortcuts();
+    setupVolumeControl();
 });
 
 // Загрузка избранных станций
@@ -112,28 +118,80 @@ function createRadioCard(name, station) {
     card.className = "radio-card";
     if (name === currentStation) card.classList.add("active");
 
+    const stationInfo = document.createElement("div");
+    stationInfo.className = "station-info";
+
     const stationName = document.createElement("p");
     stationName.className = "radio-name";
     stationName.textContent = name;
 
+    const stationDetails = document.createElement("p");
+    stationDetails.className = "station-details";
+    stationDetails.textContent = `${station.category} • 128kbps`;
+
+    const controls = document.createElement("div");
+    controls.className = "station-controls";
+
     const playButton = document.createElement("button");
     playButton.className = "play-button";
-    playButton.textContent = "▶";
+    playButton.innerHTML = '<i class="fas fa-play"></i>';
     playButton.addEventListener("click", () => playStation(name, station.url));
 
-    card.appendChild(stationName);
-    card.appendChild(playButton);
+    const favoriteButton = document.createElement("button");
+    favoriteButton.className = "favorite-button";
+    favoriteButton.innerHTML = favorites.includes(name) ? 
+        '<i class="fas fa-heart"></i>' : 
+        '<i class="far fa-heart"></i>';
+    favoriteButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleFavorite(name, favoriteButton);
+    });
+
+    controls.appendChild(playButton);
+    controls.appendChild(favoriteButton);
+    stationInfo.appendChild(stationName);
+    stationInfo.appendChild(stationDetails);
+    card.appendChild(stationInfo);
+    card.appendChild(controls);
     radioList.appendChild(card);
+}
+
+// Переключение избранного
+function toggleFavorite(name, button) {
+    const index = favorites.indexOf(name);
+    if (index === -1) {
+        favorites.push(name);
+        button.innerHTML = '<i class="fas fa-heart"></i>';
+    } else {
+        favorites.splice(index, 1);
+        button.innerHTML = '<i class="far fa-heart"></i>';
+    }
+    saveFavorites();
+    if (activeCategory === "Избранное") {
+        displayRadioStations("Избранное");
+    }
 }
 
 // Воспроизведение радиостанции с анимацией
 function playStation(name, url) {
     loadingIndicator.classList.remove("hidden");
     player.src = url;
+    
+    // Добавляем обработчик ошибок
+    player.onerror = () => {
+        loadingIndicator.classList.add("hidden");
+        alert("Ошибка воспроизведения станции. Попробуйте еще раз.");
+        setTimeout(() => {
+            player.src = url;
+            player.play();
+        }, 3000);
+    };
+
     player.play().then(() => {
         currentStation = name;
         updateCurrentStationDisplay();
         saveLastStation();
+        animationContainer.classList.add("active");
 
         // Анимация смены станции
         document.querySelectorAll(".radio-card").forEach(card => card.classList.remove("active"));
@@ -172,6 +230,72 @@ function playRandomStation() {
     const stations = Object.entries(radioStations);
     const [randomName, randomStation] = stations[Math.floor(Math.random() * stations.length)];
     playStation(randomName, randomStation.url);
+}
+
+// Настройка управления громкостью
+function setupVolumeControl() {
+    const volumeSlider = document.createElement("input");
+    volumeSlider.type = "range";
+    volumeSlider.min = "0";
+    volumeSlider.max = "1";
+    volumeSlider.step = "0.1";
+    volumeSlider.value = "1";
+    volumeSlider.className = "volume-slider";
+    
+    const volumeContainer = document.createElement("div");
+    volumeContainer.className = "volume-control";
+    volumeContainer.innerHTML = '<i class="fas fa-volume-up"></i>';
+    volumeContainer.appendChild(volumeSlider);
+    
+    document.querySelector(".player-container").insertBefore(volumeContainer, player);
+    
+    volumeSlider.addEventListener("input", (e) => {
+        player.volume = e.target.value;
+        lastVolume = e.target.value;
+        updateVolumeIcon(e.target.value);
+    });
+}
+
+// Обновление иконки громкости
+function updateVolumeIcon(volume) {
+    const icon = document.querySelector(".volume-control i");
+    if (volume == 0) {
+        icon.className = "fas fa-volume-mute";
+    } else if (volume < 0.5) {
+        icon.className = "fas fa-volume-down";
+    } else {
+        icon.className = "fas fa-volume-up";
+    }
+}
+
+// Переключение режима без звука
+function toggleMute() {
+    isMuted = !isMuted;
+    if (isMuted) {
+        player.volume = 0;
+    } else {
+        player.volume = lastVolume;
+    }
+    updateVolumeIcon(player.volume);
+}
+
+// Настройка горячих клавиш
+function setupKeyboardShortcuts() {
+    document.addEventListener("keydown", (e) => {
+        switch(e.code) {
+            case "Space":
+                e.preventDefault();
+                if (player.paused) player.play();
+                else player.pause();
+                break;
+            case "ArrowRight":
+                playRandomStation();
+                break;
+            case "KeyM":
+                toggleMute();
+                break;
+        }
+    });
 }
 
 // Обработчики событий

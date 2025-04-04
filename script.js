@@ -23,13 +23,10 @@ const searchInput = document.getElementById('search-input');
 const genreSelect = document.getElementById('genre-select');
 const sortControls = document.querySelectorAll('input[name="sort"]');
 const refreshButton = document.getElementById('refresh-button');
-const addStationButton = document.getElementById('add-station-button');
-const addStationModal = document.getElementById('add-station-modal');
-const addStationForm = document.getElementById('add-station-form');
 const statusElement = document.getElementById('status');
 
 // Radio Browser API endpoint
-const API_BASE = 'https://api.radio-browser.info/json/stations/search';
+const API_BASE = 'http://all.api.radio-browser.info/json/stations/search';
 
 // Initialize the application
 async function init() {
@@ -37,7 +34,6 @@ async function init() {
     setupVolumeControls();
     setupAudioEvents();
     setupSearchAndFilters();
-    setupModalHandlers();
     
     // Load stations from localStorage or fetch new ones
     const savedStations = loadFromLocalStorage();
@@ -71,74 +67,52 @@ function setupSearchAndFilters() {
     });
 }
 
-// Setup modal handlers
-function setupModalHandlers() {
-    addStationButton.addEventListener('click', () => {
-        addStationModal.classList.add('show');
-    });
-
-    addStationForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const newStation = {
-            name: document.getElementById('station-name').value,
-            url_resolved: document.getElementById('station-url').value,
-            tags: document.getElementById('station-genre').value,
-            country: document.getElementById('station-country').value,
-            votes: 0,
-            isCustom: true
-        };
-        
-        stations.push(newStation);
-        saveToLocalStorage();
-        filterAndDisplayStations();
-        addStationModal.classList.remove('show');
-        addStationForm.reset();
-        showNotification('Станция добавлена', 'info');
-    });
-
-    document.querySelector('.cancel-button').addEventListener('click', () => {
-        addStationModal.classList.remove('show');
-        addStationForm.reset();
-    });
-}
-
-// Fetch stations from Radio Browser API
+// Функция для парсинга станций с RadioBrowser
 async function fetchStations() {
+    const url = API_BASE;
+    const params = {
+        tag: genreSelect.value !== 'all' ? genreSelect.value : '',
+        lastcheckok: "1",
+        limit: "100",
+        order: "clickcount",
+        reverse: "true"
+    };
+
     try {
         showLoading();
         updateStatusMessage('Загрузка станций...');
         
-        const genre = genreSelect.value;
-        const params = new URLSearchParams({
-            limit: 100,
-            hidebroken: true,
-            order: 'votes',
-            reverse: true,
-            tagList: genre !== 'all' ? genre : ''
-        });
+        console.log('Запрос к API:', `${url}?${new URLSearchParams(params)}`);
+        const response = await fetch(`${url}?${new URLSearchParams(params)}`);
+        if (!response.ok) {
+            throw new Error(`Ошибка HTTP: ${response.status}`);
+        }
         
-        const response = await fetch(`${API_BASE}?${params}`);
-        if (!response.ok) throw new Error('Failed to fetch stations');
-        
-        const newStations = await response.json();
-        console.log('Получено станций:', newStations.length);
-        console.log('Пример станции:', newStations[0]);
-        
+        const stationsData = await response.json();
+        console.log('Получено станций:', stationsData.length);
+        console.log('Пример станции:', stationsData[0]);
+
+        stations = stationsData.map(station => ({
+            name: station.name,
+            url_resolved: station.url_resolved,
+            tags: station.tags,
+            country: station.country,
+            votes: station.clickcount || 0
+        }));
+
+        console.log('Обработано станций:', stations.length);
+        console.log('Пример обработанной станции:', stations[0]);
+
         hideLoading();
-        
-        // Merge with custom stations
-        const customStations = stations.filter(s => s.isCustom);
-        stations = [...newStations, ...customStations];
         saveToLocalStorage();
-        
         updateStatusMessage(`Загружено ${stations.length} станций`);
         return stations;
     } catch (error) {
-        console.error('Error fetching stations:', error);
+        console.error("Ошибка при парсинге станций:", error);
         hideLoading();
         showNotification('Ошибка загрузки станций', 'error');
         updateStatusMessage('Ошибка загрузки станций');
-        return [];
+        return loadFromLocalStorage() || [];
     }
 }
 
@@ -148,14 +122,13 @@ function filterAndDisplayStations() {
     const genre = genreSelect.value;
     const sortBy = document.querySelector('input[name="sort"]:checked').value;
     
-    console.log('Фильтрация станций:', {
+    console.log('Параметры фильтрации:', {
         searchTerm,
         genre,
         sortBy,
         totalStations: stations.length
     });
     
-    // Filter stations
     filteredStations = stations.filter(station => {
         const matchesSearch = station.name.toLowerCase().includes(searchTerm);
         const matchesGenre = genre === 'all' || 
@@ -165,7 +138,6 @@ function filterAndDisplayStations() {
     
     console.log('Отфильтровано станций:', filteredStations.length);
     
-    // Sort stations
     filteredStations.sort((a, b) => {
         if (sortBy === 'name') {
             return a.name.localeCompare(b.name);
@@ -334,48 +306,43 @@ function setupVolumeControls() {
 
 // Play station with improved error handling and loading states
 async function playStation(station) {
-    if (!station || !station.url) {
-        showNotification('Invalid station data', 'error');
+    console.log('Воспроизведение станции:', station);
+    
+    if (!station || !station.url_resolved) {
+        showNotification('Неверные данные станции', 'error');
         return;
     }
     
-    // Check internet connection
     if (!navigator.onLine) {
-        showNotification('No internet connection', 'error');
+        showNotification('Нет подключения к интернету', 'error');
         return;
     }
     
-    // If clicking the same station
-    if (currentStation && currentStation.url === station.url) {
+    if (currentStation && currentStation.url_resolved === station.url_resolved) {
         togglePlayPause();
         return;
     }
     
     try {
-        // Start loading
         showLoading();
         
-        // Stop current playback if any
         if (audio.src) {
             audio.pause();
             isPlaying = false;
             updatePlayPauseButton();
         }
         
-        // Update current station
         currentStation = station;
         currentStationElement.textContent = station.name;
+        audio.src = station.url_resolved;
         
-        // Set new audio source
-        audio.src = station.url;
-        
-        // Attempt to play
         await audio.play();
         isPlaying = true;
         updatePlayPauseButton();
         hideLoading();
-        showNotification(`Playing: ${station.name}`, 'info');
+        showNotification(`Играет: ${station.name}`, 'info');
     } catch (error) {
+        console.error('Ошибка воспроизведения:', error);
         handlePlaybackError(error);
     }
 }

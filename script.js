@@ -1,5 +1,5 @@
 // Audio player instance
-const audio = new Audio();
+let audio = new Audio();
 let currentStation = null;
 let isPlaying = false;
 let volume = 1;
@@ -1088,6 +1088,22 @@ const radioStations = {
     ]
 };
 
+// Add format support detection
+const audioFormats = {
+    canPlayType: (function() {
+        const audio = new Audio();
+        return {
+            mp3: audio.canPlayType('audio/mpeg').replace(/^no$/, ''),
+            aac: audio.canPlayType('audio/aac').replace(/^no$/, ''),
+            aacp: audio.canPlayType('audio/aacp').replace(/^no$/, ''),
+            ogg: audio.canPlayType('audio/ogg; codecs="vorbis"').replace(/^no$/, ''),
+            opus: audio.canPlayType('audio/ogg; codecs="opus"').replace(/^no$/, ''),
+            m3u8: audio.canPlayType('application/vnd.apple.mpegurl').replace(/^no$/, ''),
+            m3u: audio.canPlayType('audio/x-mpegurl').replace(/^no$/, '')
+        };
+    })()
+};
+
 // Initialize the application
 function init() {
     setupCategories();
@@ -1177,8 +1193,15 @@ function createStationCard(station) {
 function setupPlayerControls() {
     if (!playPauseButton) return;
     
+    // Play/Pause button
     playPauseButton.addEventListener('click', () => {
-        togglePlayPause();
+        if (isPlaying) {
+            stopPlayback();
+        } else if (currentStation) {
+            startPlayback();
+        } else {
+            showNotification('Please select a station first', 'info');
+        }
     });
     
     // Update play/pause button state when audio state changes
@@ -1198,9 +1221,72 @@ function setupPlayerControls() {
     
     // Add ended event listener to properly handle stream end
     audio.addEventListener('ended', () => {
-        isPlaying = false;
-        updatePlayPauseButton();
+        stopPlayback();
     });
+}
+
+// Stop playback completely
+function stopPlayback() {
+    if (!audio) return;
+    
+    try {
+        audio.pause();
+        audio.currentTime = 0;
+        isPlaying = false;
+        isLoading = false;
+        updatePlayPauseButton();
+        hideLoading();
+        showNotification('Playback stopped', 'info');
+    } catch (error) {
+        console.error('Error stopping playback:', error);
+    }
+}
+
+// Start playback
+function startPlayback() {
+    if (!currentStation || !audio) return;
+    
+    if (isLoading) {
+        showNotification('Please wait while the station is loading', 'info');
+        return;
+    }
+    
+    try {
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    isPlaying = true;
+                    updatePlayPauseButton();
+                    showNotification(`Playing: ${currentStation.name}`, 'info');
+                })
+                .catch(error => {
+                    handlePlaybackError(error);
+                });
+        }
+    } catch (error) {
+        handlePlaybackError(error);
+    }
+}
+
+// Toggle play/pause (updated)
+function togglePlayPause() {
+    if (!currentStation) {
+        showNotification('Please select a station first', 'info');
+        return;
+    }
+    
+    if (isLoading) {
+        showNotification('Please wait while the station is loading', 'info');
+        return;
+    }
+    
+    if (isPlaying) {
+        stopPlayback();
+    } else {
+        startPlayback();
+    }
 }
 
 // Setup volume controls
@@ -1224,103 +1310,6 @@ function setupVolumeControls() {
     
     // Mute button click
     muteButton.addEventListener('click', toggleMute);
-}
-
-// Toggle play/pause
-function togglePlayPause() {
-    if (!currentStation) {
-        showNotification('Please select a station first', 'info');
-        return;
-    }
-    
-    if (isLoading) {
-        showNotification('Please wait while the station is loading', 'info');
-        return;
-    }
-    
-    if (isPlaying) {
-        audio.pause();
-        isPlaying = false;
-        updatePlayPauseButton();
-        showNotification('Playback paused', 'info');
-    } else {
-        audio.play()
-            .then(() => {
-                isPlaying = true;
-                updatePlayPauseButton();
-                showNotification('Playback resumed', 'info');
-            })
-            .catch(error => {
-                handlePlaybackError(error);
-            });
-    }
-}
-
-// Play station with improved error handling and loading states
-function playStation(station) {
-    if (!station || !station.url) {
-        showNotification('Invalid station data', 'error');
-        return;
-    }
-    
-    // Check internet connection
-    if (!navigator.onLine) {
-        showNotification('No internet connection', 'error');
-        return;
-    }
-    
-    // If clicking the same station
-    if (currentStation && currentStation.url === station.url) {
-        togglePlayPause();
-        return;
-    }
-    
-    // Start loading
-    isLoading = true;
-    showLoading();
-    
-    // Set loading timeout
-    const loadingTimeout = setTimeout(() => {
-        if (!isPlaying) {
-            isLoading = false;
-            handlePlaybackError(new Error('Loading timeout'));
-        }
-    }, 10000); // 10 seconds timeout
-    
-    try {
-        // Stop current playback if any
-        if (audio.src) {
-            audio.pause();
-            isPlaying = false;
-            updatePlayPauseButton();
-        }
-        
-        currentStation = station;
-        audio.src = station.url;
-        
-        // Update UI before attempting to play
-        currentStationElement.textContent = station.name;
-        
-        // Attempt to play
-        audio.play()
-            .then(() => {
-                clearTimeout(loadingTimeout);
-                isLoading = false;
-                hideLoading();
-                isPlaying = true;
-                updatePlayPauseButton();
-                showNotification(`Playing: ${station.name}`, 'info');
-            })
-            .catch(error => {
-                clearTimeout(loadingTimeout);
-                isLoading = false;
-                handlePlaybackError(error);
-            });
-    } catch (error) {
-        clearTimeout(loadingTimeout);
-        isLoading = false;
-        handlePlaybackError(error);
-    }
 }
 
 // Update play/pause button
@@ -1366,33 +1355,47 @@ function hideLoading() {
     loadingOverlay.style.display = 'none';
 }
 
-// Enhanced error handling
+// Enhanced error handling with format-specific messages
 function handlePlaybackError(error) {
     console.error('Playback error:', error);
     hideLoading();
+    isLoading = false;
     
     let message = 'Error playing station';
     
-    // Specific error messages based on error type
     if (!navigator.onLine) {
         message = 'No internet connection';
     } else if (error.name === 'NotSupportedError') {
-        message = 'Audio format not supported';
+        const codec = currentStation?.codec || 'Unknown';
+        message = `Audio format ${codec} not supported by your browser`;
     } else if (error.name === 'NotAllowedError') {
         message = 'Playback not allowed';
     } else if (error.message === 'Loading timeout') {
         message = 'Station loading timeout';
+    } else if (error.name === 'AbortError') {
+        message = 'Playback aborted';
+    } else if (error.name === 'MediaError') {
+        switch(error.code) {
+            case 1:
+                message = 'Stream loading aborted';
+                break;
+            case 2:
+                message = 'Network error while loading stream';
+                break;
+            case 3:
+                message = `Error decoding ${currentStation?.codec || 'audio'} stream`;
+                break;
+            case 4:
+                message = `Stream format ${currentStation?.codec || ''} not supported`;
+                break;
+        }
     }
     
     showNotification(message, 'error');
     
-    // Only reset player state if it's a critical error
-    if (error.name === 'NotSupportedError' || error.name === 'NotAllowedError') {
-        if (currentStation) {
-            currentStation = null;
-            currentStationElement.textContent = 'Select a station';
-            updatePlayPauseButton();
-        }
+    if (currentStation) {
+        isPlaying = false;
+        updatePlayPauseButton();
     }
 }
 
@@ -1416,7 +1419,7 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Setup audio event listeners
+// Enhanced audio events setup
 function setupAudioEvents() {
     audio.addEventListener('ended', () => {
         isPlaying = false;
@@ -1435,6 +1438,13 @@ function setupAudioEvents() {
         showLoading();
     });
     
+    audio.addEventListener('playing', () => {
+        isLoading = false;
+        hideLoading();
+        isPlaying = true;
+        updatePlayPauseButton();
+    });
+    
     audio.addEventListener('canplay', () => {
         isLoading = false;
         hideLoading();
@@ -1450,30 +1460,180 @@ function setupAudioEvents() {
         updatePlayPauseButton();
     });
     
-    // Handle page visibility change
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden && isPlaying) {
-            audio.pause();
-            isPlaying = false;
-            updatePlayPauseButton();
-        }
+    audio.addEventListener('stalled', () => {
+        isLoading = true;
+        showLoading();
     });
     
-    // Handle online/offline events
-    window.addEventListener('online', () => {
-        if (currentStation && !isPlaying) {
-            playStation(currentStation);
-        }
+    audio.addEventListener('suspend', () => {
+        isLoading = false;
+        hideLoading();
     });
     
-    window.addEventListener('offline', () => {
-        if (isPlaying) {
-            audio.pause();
-            isPlaying = false;
-            updatePlayPauseButton();
-            handlePlaybackError(new Error('Lost internet connection'));
+    // Add buffering detection
+    let lastPlayPos = 0;
+    let currentPlayPos = 0;
+    let bufferingDetected = false;
+    
+    const checkBuffering = setInterval(() => {
+        currentPlayPos = audio.currentTime;
+        
+        // Check if position has changed
+        const offset = 1 / 50;
+        if (!bufferingDetected && currentPlayPos < (lastPlayPos + offset) && !audio.paused) {
+            showLoading();
+            bufferingDetected = true;
         }
-    });
+        
+        // Check if buffering has ended
+        if (bufferingDetected && currentPlayPos > (lastPlayPos + offset) && !audio.paused) {
+            hideLoading();
+            bufferingDetected = false;
+        }
+        
+        lastPlayPos = currentPlayPos;
+    }, 100);
+}
+
+// Enhanced playStation function
+function playStation(station) {
+    if (!station || !station.url) {
+        showNotification('Invalid station data', 'error');
+        return;
+    }
+    
+    // Check internet connection
+    if (!navigator.onLine) {
+        showNotification('No internet connection', 'error');
+        return;
+    }
+    
+    // If clicking the same station that's currently playing, stop it
+    if (currentStation && currentStation.url === station.url && isPlaying) {
+        stopPlayback();
+        return;
+    }
+    
+    // Start loading
+    isLoading = true;
+    showLoading();
+    
+    try {
+        // Stop current playback if any
+        if (audio.src) {
+            stopPlayback();
+        }
+        
+        // Create new Audio element for each stream
+        audio = new Audio();
+        
+        // Set audio attributes
+        audio.crossOrigin = "anonymous";
+        audio.preload = "auto";
+        
+        // Check format support
+        const codec = station.codec.toLowerCase();
+        const isSupported = checkCodecSupport(codec);
+        
+        if (!isSupported) {
+            showNotification(`Warning: ${station.codec} format may not be fully supported by your browser`, 'warning');
+        }
+        
+        // Add format-specific optimizations
+        if (codec === 'aac' || codec === 'aac+' || codec === 'aacp') {
+            audio.mozAudioChannelType = 'content';
+        }
+        
+        // Set up error recovery
+        setupErrorRecovery(station);
+        
+        // Set up enhanced audio events
+        setupAudioEvents();
+        
+        // Configure audio settings
+        audio.volume = volume;
+        audio.muted = isMuted;
+        
+        currentStation = station;
+        audio.src = station.url;
+        
+        // Force load the audio
+        audio.load();
+        
+        // Update UI
+        currentStationElement.textContent = station.name;
+        
+        // Attempt to play with timeout
+        const playPromise = audio.play();
+        
+        // Set a timeout for the initial loading
+        const loadingTimeout = setTimeout(() => {
+            if (isLoading) {
+                stopPlayback();
+                handlePlaybackError(new Error('Loading timeout'));
+            }
+        }, 10000);
+        
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    clearTimeout(loadingTimeout);
+                    isLoading = false;
+                    hideLoading();
+                    isPlaying = true;
+                    updatePlayPauseButton();
+                    showNotification(`Playing: ${station.name} (${station.codec} ${station.bitrate})`, 'info');
+                })
+                .catch(error => {
+                    clearTimeout(loadingTimeout);
+                    handlePlaybackError(error);
+                });
+        }
+    } catch (error) {
+        handlePlaybackError(error);
+    }
+}
+
+// Setup error recovery
+function setupErrorRecovery(station) {
+    let errorRetryCount = 0;
+    const maxRetries = 3;
+    
+    audio.onerror = function(e) {
+        console.error('Audio error:', e);
+        if (errorRetryCount < maxRetries) {
+            errorRetryCount++;
+            console.log(`Retrying playback (attempt ${errorRetryCount})`);
+            
+            setTimeout(() => {
+                if (currentStation === station) {
+                    audio.load();
+                    audio.play().catch(handlePlaybackError);
+                }
+            }, 1000);
+        } else {
+            handlePlaybackError(e);
+        }
+    };
+}
+
+// Check codec support
+function checkCodecSupport(codec) {
+    codec = codec.toLowerCase();
+    switch (codec) {
+        case 'mp3':
+            return audioFormats.canPlayType.mp3;
+        case 'aac':
+        case 'aac+':
+        case 'aacp':
+            return audioFormats.canPlayType.aac || audioFormats.canPlayType.aacp;
+        case 'ogg':
+            return audioFormats.canPlayType.ogg;
+        case 'opus':
+            return audioFormats.canPlayType.opus;
+        default:
+            return false;
+    }
 }
 
 // Initialize the application when the DOM is loaded

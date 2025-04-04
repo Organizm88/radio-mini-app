@@ -229,7 +229,11 @@ function createStationCard(station) {
 
 // Setup player controls
 function setupPlayerControls() {
-    playPauseButton.addEventListener('click', togglePlayPause);
+    if (!playPauseButton) return;
+    
+    playPauseButton.addEventListener('click', () => {
+        togglePlayPause();
+    });
     
     // Update play/pause button state when audio state changes
     audio.addEventListener('play', () => {
@@ -303,7 +307,8 @@ function playStation(station) {
         // Stop current playback if any
         if (audio.src) {
             audio.pause();
-            audio.src = '';
+            isPlaying = false;
+            updatePlayPauseButton();
         }
         
         currentStation = station;
@@ -311,13 +316,14 @@ function playStation(station) {
         
         // Update UI before attempting to play
         currentStationElement.textContent = station.name;
-        updatePlayPauseButton();
         
         // Attempt to play
         audio.play()
             .then(() => {
                 clearTimeout(loadingTimeout);
                 hideLoading();
+                isPlaying = true;
+                updatePlayPauseButton();
                 showNotification(`Playing: ${station.name}`, 'info');
             })
             .catch(error => {
@@ -332,17 +338,24 @@ function playStation(station) {
 
 // Toggle play/pause
 function togglePlayPause() {
-    if (!currentStation) return;
+    if (!currentStation) {
+        showNotification('Please select a station first', 'info');
+        return;
+    }
     
     if (isPlaying) {
         audio.pause();
+        isPlaying = false;
     } else {
         audio.play().catch(handlePlaybackError);
+        isPlaying = true;
     }
+    updatePlayPauseButton();
 }
 
 // Update play/pause button
 function updatePlayPauseButton() {
+    if (!playPauseButton) return;
     playPauseButton.textContent = isPlaying ? '⏸' : '▶';
 }
 

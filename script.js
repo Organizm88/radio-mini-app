@@ -230,9 +230,8 @@ function createStationCard(station) {
 // Setup player controls
 function setupPlayerControls() {
     playPauseButton.addEventListener('click', togglePlayPause);
-    prevStationButton.addEventListener('click', playPreviousStation);
-    nextStationButton.addEventListener('click', playNextStation);
     
+    // Update play/pause button state when audio state changes
     audio.addEventListener('play', () => {
         isPlaying = true;
         updatePlayPauseButton();
@@ -269,23 +268,6 @@ function setupVolumeControls() {
     
     // Mute button click
     muteButton.addEventListener('click', toggleMute);
-}
-
-// Get all stations as a flat array
-function getAllStations() {
-    return Object.values(radioStations).flat();
-}
-
-// Get current category stations
-function getCurrentCategoryStations() {
-    if (!currentStation) return getAllStations();
-    
-    const currentCategory = Object.entries(radioStations)
-        .find(([category, stations]) => 
-            stations.some(station => station.name === currentStation.name)
-        )?.[0];
-    
-    return currentCategory ? radioStations[currentCategory] : getAllStations();
 }
 
 // Play station with improved error handling and loading states
@@ -359,38 +341,9 @@ function togglePlayPause() {
     }
 }
 
-// Play previous station
-function playPreviousStation() {
-    if (!currentStation) {
-        const stations = getAllStations();
-        if (stations.length > 0) {
-            playStation(stations[stations.length - 1]);
-        }
-        return;
-    }
-    
-    const stations = getCurrentCategoryStations();
-    const currentIndex = stations.findIndex(s => s.name === currentStation.name);
-    const prevIndex = (currentIndex - 1 + stations.length) % stations.length;
-    
-    playStation(stations[prevIndex]);
-}
-
-// Play next station
-function playNextStation() {
-    if (!currentStation) {
-        const stations = getAllStations();
-        if (stations.length > 0) {
-            playStation(stations[0]);
-        }
-        return;
-    }
-    
-    const stations = getCurrentCategoryStations();
-    const currentIndex = stations.findIndex(s => s.name === currentStation.name);
-    const nextIndex = (currentIndex + 1) % stations.length;
-    
-    playStation(stations[nextIndex]);
+// Update play/pause button
+function updatePlayPauseButton() {
+    playPauseButton.textContent = isPlaying ? '⏸' : '▶';
 }
 
 // Toggle mute
@@ -407,11 +360,6 @@ function toggleMute() {
     }
     
     updateMuteButton();
-}
-
-// Update play/pause button
-function updatePlayPauseButton() {
-    playPauseButton.textContent = isPlaying ? '⏸' : '▶';
 }
 
 // Update mute button

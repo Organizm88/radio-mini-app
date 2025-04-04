@@ -25,25 +25,24 @@ body {
     top: 0;
     left: 0;
     right: 0;
+    background: var(--primary-color);
+    padding: 10px;
     z-index: 1000;
-    background-color: var(--secondary-color);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .player-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing);
-    height: var(--player-height);
-    box-sizing: border-box;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .player-info {
     display: flex;
     align-items: center;
-    gap: var(--spacing);
+    gap: 20px;
     flex: 1;
 }
 
@@ -65,8 +64,12 @@ body {
 }
 
 #current-station {
-    font-weight: 600;
-    font-size: 16px;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .playback-animation {
@@ -93,45 +96,54 @@ body {
 .player-controls {
     display: flex;
     align-items: center;
-    gap: var(--spacing);
+    gap: 15px;
 }
 
 .control-button {
     background: none;
     border: none;
     color: var(--text-color);
-    font-size: 24px;
+    font-size: 1.5rem;
     cursor: pointer;
-    padding: 8px;
-    border-radius: 50%;
-    transition: background-color 0.2s;
+    padding: 5px;
+    transition: transform 0.2s;
 }
 
 .control-button:hover {
-    background-color: var(--hover-color);
+    transform: scale(1.1);
 }
 
-.volume-control {
+.volume-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 #volume-slider {
     width: 100px;
-    height: 4px;
+    height: 5px;
     -webkit-appearance: none;
-    background: var(--hover-color);
-    border-radius: 2px;
+    background: var(--secondary-color);
+    border-radius: 3px;
+    outline: none;
 }
 
 #volume-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    background: var(--primary-color);
+    width: 15px;
+    height: 15px;
+    background: var(--accent-color);
     border-radius: 50%;
     cursor: pointer;
+}
+
+#volume-slider::-moz-range-thumb {
+    width: 15px;
+    height: 15px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
 }
 
 /* Categories Styles */
@@ -322,7 +334,7 @@ body {
         font-size: 14px;
     }
 
-    .volume-control {
+    .volume-controls {
         display: none;
     }
 }

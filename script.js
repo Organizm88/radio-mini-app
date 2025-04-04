@@ -4,6 +4,8 @@ let currentStation = null;
 let isPlaying = false;
 let volume = 1;
 let isMuted = false;
+let stations = [];
+let filteredStations = [];
 
 // DOM elements
 const playerBar = document.querySelector('.player-bar');
@@ -17,238 +19,294 @@ const loadingOverlay = document.getElementById('loading');
 const notification = document.getElementById('notification');
 const categoriesContainer = document.getElementById('categories');
 const radioList = document.getElementById('radio-list');
+const searchInput = document.getElementById('search-input');
+const genreSelect = document.getElementById('genre-select');
+const sortControls = document.querySelectorAll('input[name="sort"]');
+const refreshButton = document.getElementById('refresh-button');
+const addStationButton = document.getElementById('add-station-button');
+const addStationModal = document.getElementById('add-station-modal');
+const addStationForm = document.getElementById('add-station-form');
+const statusElement = document.getElementById('status');
 
-// Radio stations data
-const radioStations = {
-    "Поп-музыка": [
-        { name: "Европа Плюс", url: "http://europaplus.hostingradio.ru:8014/europaplus320.mp3", bitrate: "320 kbps" },
-        { name: "Русское Радио", url: "https://rusradio.hostingradio.ru/rusradio96.aacp", bitrate: "96 kbps" },
-        { name: "Новое Радио", url: "https://icecast-newradio.cdnvideo.ru/newradio3", bitrate: "128 kbps" },
-        { name: "Love Radio", url: "http://stream.loveradio.ru/12_love_28?type=.aac", bitrate: "128 kbps" },
-        { name: "Хит FM", url: "http://hitfm.hostingradio.ru/hitfm128.mp3", bitrate: "128 kbps" },
-        { name: "DFM", url: "https://dfm.hostingradio.ru/dfm96.aacp", bitrate: "96 kbps" },
-        { name: "Радио ENERGY", url: "https://pub0301.101.ru:8443/stream/air/mp3/256/99", bitrate: "256 kbps" },
-        { name: "Зайцев FM Pop", url: "https://zaycev.fm:9002/pop128.mp3", bitrate: "128 kbps" },
-        { name: "Радио Maximum", url: "https://maximum.hostingradio.ru/maximum128.mp3", bitrate: "128 kbps" },
-        { name: "Радио Monte Carlo", url: "https://montecarlo.hostingradio.ru/montecarlo128.mp3", bitrate: "128 kbps" }
-    ],
-    "Танцевальная": [
-        { name: "Радио Рекорд", url: "https://air.radiorecord.ru:805/rr_320", bitrate: "320 kbps" },
-        { name: "DFM Dance", url: "https://dfm-dance.hostingradio.ru/dance96.aacp", bitrate: "96 kbps" },
-        { name: "Record Deep", url: "https://air.radiorecord.ru:805/deep_320", bitrate: "320 kbps" },
-        { name: "Record Trance", url: "https://air.radiorecord.ru:805/trance_320", bitrate: "320 kbps" },
-        { name: "Garage FM", url: "https://garagefm.ru:8000/garagefm", bitrate: "128 kbps" },
-        { name: "Revolution Radio", url: "https://revolutionradio.ru:8000/live", bitrate: "128 kbps" },
-        { name: "Q-Dance", url: "https://stream.q-dance.com/hardstyle", bitrate: "128 kbps" },
-        { name: "Record Goa/Psy Trance", url: "https://air.radiorecord.ru:805/goa_320", bitrate: "320 kbps" },
-        { name: "Soundpark Deep", url: "https://soundpark.hostingradio.ru/soundpark128.mp3", bitrate: "128 kbps" },
-        { name: "Pirate Station", url: "https://air.radiorecord.ru:805/ps_320", bitrate: "320 kbps" }
-    ],
-    "Рок": [
-        { name: "Наше Радио", url: "https://nashe1.hostingradio.ru/nashe-256", bitrate: "256 kbps" },
-        { name: "Rock FM", url: "https://rockfm.hostingradio.ru/rockfm128.mp3", bitrate: "128 kbps" },
-        { name: "Радио Maximum", url: "https://maximum.hostingradio.ru/maximum128.mp3", bitrate: "128 kbps" },
-        { name: "Легенды Рока", url: "https://rocklegends.ru:8000/rock", bitrate: "128 kbps" },
-        { name: "DKFM Shoegaze Radio", url: "https://stream.dkfm.rocks:8000/shoegaze", bitrate: "128 kbps" },
-        { name: "Radio ROKS", url: "https://online-radio.roks.ua/RadioROKS_320", bitrate: "320 kbps" },
-        { name: "KXRY (XRAY.fm)", url: "https://stream.xray.fm/stream", bitrate: "128 kbps" },
-        { name: "NTS Radio Rock", url: "https://stream-1a.ntslive.net/stream", bitrate: "128 kbps" },
-        { name: "Ария FM", url: "https://ariafm.ru:8000/aria", bitrate: "128 kbps" },
-        { name: "New New World Radio", url: "https://nnwradio.com:8000/stream", bitrate: "128 kbps" }
-    ],
-    "Ретро": [
-        { name: "Ретро FM", url: "https://retro.hostingradio.ru:8014/retro320.mp3", bitrate: "320 kbps" },
-        { name: "Радио Дача", url: "https://radiodacha.hostingradio.ru/radiodacha128.mp3", bitrate: "128 kbps" },
-        { name: "Авторадио", url: "https://pub0301.101.ru:8443/stream/air/mp3/256/100", bitrate: "256 kbps" },
-        { name: "Радио 7", url: "https://radio7.hostingradio.ru/radio7128.mp3", bitrate: "128 kbps" },
-        { name: "Monte Carlo Nights", url: "https://montecarlo.hostingradio.ru/nights128.mp3", bitrate: "128 kbps" },
-        { name: "Золотые Хиты", url: "https://goldenhits.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Радио Шторм", url: "https://shtorm.fm:8000/radio", bitrate: "128 kbps" },
-        { name: "MJoy Greatest Songs", url: "https://mjoy.ua:8000/greatest", bitrate: "128 kbps" },
-        { name: "Радио Сектор", url: "https://sectorradio.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Relax FM Retro", url: "https://pub0301.101.ru:8443/stream/air/mp3/256/200", bitrate: "256 kbps" }
-    ],
-    "Джаз, Блюз, Соул": [
-        { name: "Радио Jazz", url: "https://radiojazz.hostingradio.ru/radiojazz128.mp3", bitrate: "128 kbps" },
-        { name: "Jazz FM", url: "https://listen.jazzfm.com/jazzfm", bitrate: "128 kbps" },
-        { name: "SomaFM Blues", url: "https://somafm.com/blues.pls", bitrate: "128 kbps" },
-        { name: "FIP Jazz", url: "https://stream.radiofrance.fr/fipjazz/fipjazz.m3u8", bitrate: "128 kbps" },
-        { name: "Радио Соул", url: "https://soulradio.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Smooth Jazz", url: "https://smoothjazz.com:8000/stream", bitrate: "128 kbps" },
-        { name: "Blues Radio", url: "https://bluesradio.gr:8000/stream", bitrate: "128 kbps" },
-        { name: "TSF Jazz", url: "https://tsfjazz.ice.infomaniak.ch/tsfjazz-high.mp3", bitrate: "128 kbps" },
-        { name: "Jazz24", url: "https://live.wastreaming.net/jazz24-128mp3", bitrate: "128 kbps" },
-        { name: "Soul Cafe Radio", url: "https://soulcaferadio.com:8000/stream", bitrate: "128 kbps" }
-    ],
-    "Релакс и Легкая музыка": [
-        { name: "Relax FM", url: "https://pub0301.101.ru:8443/stream/air/mp3/256/200", bitrate: "256 kbps" },
-        { name: "Lounge FM Chill-Out", url: "https://loungefm.com.ua:8000/chill", bitrate: "128 kbps" },
-        { name: "Enigmatic Immersion", url: "https://enigmatic.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Радио Атмосфера", url: "https://atmosfera.fm:8000/stream", bitrate: "128 kbps" },
-        { name: "Chillout Zone", url: "https://chillout.zone:8000/stream", bitrate: "128 kbps" },
-        { name: "SomaFM Groove Salad", url: "https://somafm.com/groovesalad.pls", bitrate: "128 kbps" },
-        { name: "Yoga Radio", url: "https://yogaradio.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Spa Radio", url: "https://sparadio.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Ambient Sleeping Pill", url: "https://ambientsleepingpill.com/stream.pls", bitrate: "128 kbps" },
-        { name: "Радио Оазис", url: "https://oasisradio.ru:8000/stream", bitrate: "128 kbps" }
-    ],
-    "Хип-хоп, Рэп, R&B": [
-        { name: "Зайцев FM RNB", url: "https://zaycev.fm:9002/rnb128.mp3", bitrate: "128 kbps" },
-        { name: "Rap FM", url: "https://rapfm.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Hot 108 Jamz", url: "https://stream.hot108.com:8000/hot108", bitrate: "128 kbps" },
-        { name: "Power 106", url: "https://live.power106.com/power106", bitrate: "128 kbps" },
-        { name: "SomaFM Underground 80s", url: "https://somafm.com/u80s.pls", bitrate: "128 kbps" },
-        { name: "Streetz Radio", url: "https://streetzradio.com:8000/stream", bitrate: "128 kbps" },
-        { name: "RNB Hits", url: "https://rnbradio.com:8000/stream", bitrate: "128 kbps" },
-        { name: "Hip Hop Nation", url: "https://hiphopnation.com:8000/stream", bitrate: "128 kbps" },
-        { name: "Boom Bap Radio", url: "https://boombapradio.com:8000/stream", bitrate: "128 kbps" },
-        { name: "Urban FM", url: "https://urbanfm.ru:8000/stream", bitrate: "128 kbps" }
-    ],
-    "Классическая музыка": [
-        { name: "Радио Орфей", url: "https://orfey.hostingradio.ru/orfey128.mp3", bitrate: "128 kbps" },
-        { name: "Classical FM", url: "https://classicalfm.co.uk:8000/stream", bitrate: "128 kbps" },
-        { name: "BBC Radio 3", url: "https://stream.live.bbc.co.uk/bbc_radio_three", bitrate: "128 kbps" },
-        { name: "Радио Культура", url: "https://kultura.hostingradio.ru/kultura128.mp3", bitrate: "128 kbps" },
-        { name: "Classic FM", url: "https://classicfm.co.uk:8000/stream", bitrate: "128 kbps" },
-        { name: "Venice Classic Radio", url: "https://veniceclassicradio.eu:8000/stream", bitrate: "128 kbps" },
-        { name: "Symphony Radio", url: "https://symphonyradio.com:8000/stream", bitrate: "128 kbps" },
-        { name: "Baroque Radio", url: "https://baroqueradio.com:8000/stream", bitrate: "128 kbps" },
-        { name: "Classical WETA", url: "https://weta.org:8000/classical", bitrate: "128 kbps" },
-        { name: "Радио Шедевр", url: "https://shedevr.fm:8000/stream", bitrate: "128 kbps" }
-    ],
-    "Разговорные и Новости": [
-        { name: "Радио Sputnik", url: "https://sputnik.hostingradio.ru/sputnik128.mp3", bitrate: "128 kbps" },
-        { name: "Вести FM", url: "https://vesti.hostingradio.ru/vesti128.mp3", bitrate: "128 kbps" },
-        { name: "Эхо Москвы", url: "https://echo.msk.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Радио КП", url: "https://radiokp.hostingradio.ru/radiokp128.mp3", bitrate: "128 kbps" },
-        { name: "Business FM", url: "https://bfm.hostingradio.ru/bfm128.mp3", bitrate: "128 kbps" },
-        { name: "Радио Маяк", url: "https://mayak.hostingradio.ru/mayak128.mp3", bitrate: "128 kbps" },
-        { name: "Соловьёв Лайф ФМ", url: "https://soloviev.live:8000/stream", bitrate: "128 kbps" },
-        { name: "Радио Патриот", url: "https://patriot.fm:8000/stream", bitrate: "128 kbps" },
-        { name: "BBC World Service", url: "https://stream.live.bbc.co.uk/bbc_world_service", bitrate: "128 kbps" },
-        { name: "NPR Radio", url: "https://npr.org:8000/stream", bitrate: "128 kbps" }
-    ],
-    "Шансон и Народная музыка": [
-        { name: "Радио Шансон", url: "https://chanson.hostingradio.ru:8041/chanson256.mp3", bitrate: "256 kbps" },
-        { name: "Калина Красная", url: "https://kalina.hostingradio.ru/kalina128.mp3", bitrate: "128 kbps" },
-        { name: "Радио Родных Дорог", url: "https://rodnyedorogi.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Русский Шансон", url: "https://russianshanson.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Folk Radio", url: "https://folkradio.co.uk:8000/stream", bitrate: "128 kbps" },
-        { name: "Шансон 24", url: "https://shanson24.ru:8000/stream", bitrate: "128 kbps" },
-        { name: "Радио Вера", url: "https://radiovera.hostingradio.ru/radiovera128.mp3", bitrate: "128 kbps" },
-        { name: "Блатняк FM", url: "https://blatnyak.fm:8000/stream", bitrate: "128 kbps" },
-        { name: "FIP Ethnic", url: "https://stream.radiofrance.fr/fipethnic/fipethnic.m3u8", bitrate: "128 kbps" },
-        { name: "Радио Станица", url: "https://stanitsa.fm:8000/stream", bitrate: "128 kbps" }
-    ]
-};
+// Radio Browser API endpoint
+const API_BASE = 'https://api.radio-browser.info/json/stations/search';
 
 // Initialize the application
-function init() {
-    setupCategories();
-    displayRadioStations();
+async function init() {
     setupPlayerControls();
     setupVolumeControls();
     setupAudioEvents();
+    setupSearchAndFilters();
+    setupModalHandlers();
+    
+    // Load stations from localStorage or fetch new ones
+    const savedStations = loadFromLocalStorage();
+    if (savedStations && savedStations.length > 0) {
+        stations = savedStations;
+        updateStatusMessage('Загружены сохраненные станции');
+        filterAndDisplayStations();
+    } else {
+        await fetchAndDisplayStations();
+    }
 }
 
-// Setup category buttons
-function setupCategories() {
-    const categories = Object.keys(radioStations);
-    categories.unshift("Все"); // Add "All" category
-    
-    const fragment = document.createDocumentFragment();
-    categories.forEach(category => {
-        const button = document.createElement('button');
-        button.className = 'category-button';
-        if (category === "Все") button.classList.add('active');
-        button.textContent = category;
-        button.dataset.category = category;
-        button.addEventListener('click', () => filterStations(category));
-        fragment.appendChild(button);
+// Setup search and filters
+function setupSearchAndFilters() {
+    searchInput.addEventListener('input', debounce(() => {
+        filterAndDisplayStations();
+    }, 300));
+
+    genreSelect.addEventListener('change', () => {
+        filterAndDisplayStations();
     });
-    
-    const categoriesContainer = document.getElementById('categories');
-    categoriesContainer.innerHTML = '';
-    categoriesContainer.appendChild(fragment);
+
+    sortControls.forEach(control => {
+        control.addEventListener('change', () => {
+            filterAndDisplayStations();
+        });
+    });
+
+    refreshButton.addEventListener('click', () => {
+        fetchAndDisplayStations();
+    });
 }
 
-// Filter stations by category
-function filterStations(category) {
-    // Update active category button
-    document.querySelectorAll('.category-button').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.category === category);
+// Setup modal handlers
+function setupModalHandlers() {
+    addStationButton.addEventListener('click', () => {
+        addStationModal.classList.add('show');
     });
 
-    // Get stations for the selected category
-    const stations = category === "Все" 
-        ? Object.values(radioStations).flat()
-        : radioStations[category] || [];
+    addStationForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const newStation = {
+            name: document.getElementById('station-name').value,
+            url_resolved: document.getElementById('station-url').value,
+            tags: document.getElementById('station-genre').value,
+            country: document.getElementById('station-country').value,
+            votes: 0,
+            isCustom: true
+        };
+        
+        stations.push(newStation);
+        saveToLocalStorage();
+        filterAndDisplayStations();
+        addStationModal.classList.remove('show');
+        addStationForm.reset();
+        showNotification('Станция добавлена', 'info');
+    });
+
+    document.querySelector('.cancel-button').addEventListener('click', () => {
+        addStationModal.classList.remove('show');
+        addStationForm.reset();
+    });
+}
+
+// Fetch stations from Radio Browser API
+async function fetchStations() {
+    try {
+        showLoading();
+        updateStatusMessage('Загрузка станций...');
+        
+        const genre = genreSelect.value;
+        const params = new URLSearchParams({
+            limit: 100,
+            hidebroken: true,
+            order: 'votes',
+            reverse: true,
+            tagList: genre !== 'all' ? genre : ''
+        });
+        
+        const response = await fetch(`${API_BASE}?${params}`);
+        if (!response.ok) throw new Error('Failed to fetch stations');
+        
+        const newStations = await response.json();
+        console.log('Получено станций:', newStations.length);
+        console.log('Пример станции:', newStations[0]);
+        
+        hideLoading();
+        
+        // Merge with custom stations
+        const customStations = stations.filter(s => s.isCustom);
+        stations = [...newStations, ...customStations];
+        saveToLocalStorage();
+        
+        updateStatusMessage(`Загружено ${stations.length} станций`);
+        return stations;
+    } catch (error) {
+        console.error('Error fetching stations:', error);
+        hideLoading();
+        showNotification('Ошибка загрузки станций', 'error');
+        updateStatusMessage('Ошибка загрузки станций');
+        return [];
+    }
+}
+
+// Filter and sort stations
+function filterAndDisplayStations() {
+    const searchTerm = searchInput.value.toLowerCase();
+    const genre = genreSelect.value;
+    const sortBy = document.querySelector('input[name="sort"]:checked').value;
     
-    // Display filtered stations
-    displayStations(stations);
+    console.log('Фильтрация станций:', {
+        searchTerm,
+        genre,
+        sortBy,
+        totalStations: stations.length
+    });
+    
+    // Filter stations
+    filteredStations = stations.filter(station => {
+        const matchesSearch = station.name.toLowerCase().includes(searchTerm);
+        const matchesGenre = genre === 'all' || 
+            (station.tags && station.tags.toLowerCase().includes(genre));
+        return matchesSearch && matchesGenre;
+    });
+    
+    console.log('Отфильтровано станций:', filteredStations.length);
+    
+    // Sort stations
+    filteredStations.sort((a, b) => {
+        if (sortBy === 'name') {
+            return a.name.localeCompare(b.name);
+        } else {
+            return b.votes - a.votes;
+        }
+    });
+    
+    displayStations(filteredStations);
+    updateStatusMessage(`Найдено ${filteredStations.length} станций`);
+}
+
+// Save stations to localStorage
+function saveToLocalStorage() {
+    try {
+        localStorage.setItem('radioStations', JSON.stringify(stations));
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+    }
+}
+
+// Load stations from localStorage
+function loadFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem('radioStations');
+        return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+        console.error('Error loading from localStorage:', error);
+        return null;
+    }
+}
+
+// Update status message
+function updateStatusMessage(message) {
+    statusElement.textContent = message;
+    statusElement.classList.add('show');
+}
+
+// Debounce helper function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
 // Display stations in the grid
 function displayStations(stations) {
+    console.log('Отображение станций:', stations.length);
+    
     const fragment = document.createDocumentFragment();
     
     if (stations.length === 0) {
         const message = document.createElement('div');
         message.className = 'no-stations';
-        message.textContent = 'No stations found in this category';
+        message.textContent = 'No stations found';
         fragment.appendChild(message);
     } else {
+        // Create table header
+        const table = document.createElement('table');
+        table.className = 'stations-table';
+        
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Station Name</th>
+                <th>Genre</th>
+                <th>Country</th>
+                <th>Controls</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+        
+        // Create table body
+        const tbody = document.createElement('tbody');
+        let validStations = 0;
         stations.forEach(station => {
-            const card = createStationCard(station);
-            fragment.appendChild(card);
+            if (station.url_resolved) {
+                const row = createStationRow(station);
+                tbody.appendChild(row);
+                validStations++;
+            }
         });
+        
+        console.log('Станций с валидным URL:', validStations);
+        
+        table.appendChild(tbody);
+        fragment.appendChild(table);
     }
     
+    // Add refresh button
+    const refreshButton = document.createElement('button');
+    refreshButton.className = 'refresh-button';
+    refreshButton.textContent = '🔄 Refresh Stations';
+    refreshButton.addEventListener('click', fetchAndDisplayStations);
+    
     radioList.innerHTML = '';
+    radioList.appendChild(refreshButton);
     radioList.appendChild(fragment);
 }
 
-// Create station card element
-function createStationCard(station) {
-    const card = document.createElement('div');
-    card.className = 'radio-card';
+// Create station row
+function createStationRow(station) {
+    const row = document.createElement('tr');
+    row.className = 'station-row';
     
-    card.innerHTML = `
-        <div class="station-info">
-            <h3 class="radio-name">${station.name}</h3>
-            <div class="station-details">${station.bitrate}</div>
-        </div>
-        <button class="play-button">▶</button>
+    row.innerHTML = `
+        <td class="station-name">${station.name || 'Unknown Station'}</td>
+        <td class="station-genre">${station.tags || 'Unknown Genre'}</td>
+        <td class="station-country">${station.country || 'Unknown Country'}</td>
+        <td class="station-controls">
+            <button class="play-button">▶</button>
+        </td>
     `;
     
-    const playButton = card.querySelector('.play-button');
-    playButton.addEventListener('click', () => playStation(station));
+    const playButton = row.querySelector('.play-button');
+    playButton.addEventListener('click', () => playStation({
+        name: station.name,
+        url: station.url_resolved
+    }));
     
-    return card;
+    return row;
 }
 
 // Setup player controls
 function setupPlayerControls() {
     if (!playPauseButton) return;
     
+    // Add click event listener to play/pause button
     playPauseButton.addEventListener('click', () => {
+        if (!currentStation) {
+            showNotification('Please select a station first', 'info');
+            return;
+        }
         togglePlayPause();
     });
-    
-    // Update play/pause button state when audio state changes
-    audio.addEventListener('play', () => {
-        isPlaying = true;
-        updatePlayPauseButton();
-    });
-    
-    audio.addEventListener('pause', () => {
-        isPlaying = false;
-        updatePlayPauseButton();
-    });
-    
-    audio.addEventListener('error', handlePlaybackError);
-    audio.addEventListener('waiting', showLoading);
-    audio.addEventListener('canplay', hideLoading);
 }
 
 // Setup volume controls
@@ -275,7 +333,7 @@ function setupVolumeControls() {
 }
 
 // Play station with improved error handling and loading states
-function playStation(station) {
+async function playStation(station) {
     if (!station || !station.url) {
         showNotification('Invalid station data', 'error');
         return;
@@ -293,17 +351,10 @@ function playStation(station) {
         return;
     }
     
-    // Start loading
-    showLoading();
-    
-    // Set loading timeout
-    const loadingTimeout = setTimeout(() => {
-        if (!isPlaying) {
-            handlePlaybackError(new Error('Loading timeout'));
-        }
-    }, 10000); // 10 seconds timeout
-    
     try {
+        // Start loading
+        showLoading();
+        
         // Stop current playback if any
         if (audio.src) {
             audio.pause();
@@ -311,27 +362,20 @@ function playStation(station) {
             updatePlayPauseButton();
         }
         
+        // Update current station
         currentStation = station;
-        audio.src = station.url;
-        
-        // Update UI before attempting to play
         currentStationElement.textContent = station.name;
         
+        // Set new audio source
+        audio.src = station.url;
+        
         // Attempt to play
-        audio.play()
-            .then(() => {
-                clearTimeout(loadingTimeout);
-                hideLoading();
-                isPlaying = true;
-                updatePlayPauseButton();
-                showNotification(`Playing: ${station.name}`, 'info');
-            })
-            .catch(error => {
-                clearTimeout(loadingTimeout);
-                handlePlaybackError(error);
-            });
+        await audio.play();
+        isPlaying = true;
+        updatePlayPauseButton();
+        hideLoading();
+        showNotification(`Playing: ${station.name}`, 'info');
     } catch (error) {
-        clearTimeout(loadingTimeout);
         handlePlaybackError(error);
     }
 }
@@ -345,12 +389,13 @@ function togglePlayPause() {
     
     if (isPlaying) {
         audio.pause();
-        isPlaying = false;
     } else {
-        audio.play().catch(handlePlaybackError);
-        isPlaying = true;
+        if (audio.src) {
+            audio.play().catch(handlePlaybackError);
+        } else {
+            playStation(currentStation);
+        }
     }
-    updatePlayPauseButton();
 }
 
 // Update play/pause button
@@ -444,41 +489,36 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Setup audio event listeners
+// Setup audio events
 function setupAudioEvents() {
-    audio.addEventListener('ended', () => {
-        handlePlaybackError(new Error('Stream ended'));
+    // Play event
+    audio.addEventListener('play', () => {
+        isPlaying = true;
+        updatePlayPauseButton();
     });
     
+    // Pause event
+    audio.addEventListener('pause', () => {
+        isPlaying = false;
+        updatePlayPauseButton();
+    });
+    
+    // Error event
     audio.addEventListener('error', (e) => {
         handlePlaybackError(e.error || new Error('Audio error'));
     });
     
+    // Loading events
     audio.addEventListener('waiting', showLoading);
     audio.addEventListener('canplay', hideLoading);
     
     // Handle page visibility change
     document.addEventListener('visibilitychange', () => {
         if (document.hidden && isPlaying) {
-            // Save state when page is hidden
             audio.dataset.wasPlaying = 'true';
         } else if (!document.hidden && audio.dataset.wasPlaying === 'true') {
-            // Restore playback when page is visible again
             delete audio.dataset.wasPlaying;
             audio.play().catch(handlePlaybackError);
-        }
-    });
-    
-    // Handle online/offline events
-    window.addEventListener('online', () => {
-        if (currentStation && !isPlaying) {
-            playStation(currentStation);
-        }
-    });
-    
-    window.addEventListener('offline', () => {
-        if (isPlaying) {
-            handlePlaybackError(new Error('Lost internet connection'));
         }
     });
 }

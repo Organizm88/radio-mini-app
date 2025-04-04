@@ -25,11 +25,58 @@
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- Categories -->
-        <div id="categories"></div>
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <!-- Search and Filters -->
+            <div class="search-filters">
+                <input type="text" id="search-input" placeholder="Поиск станций..." class="search-input">
+                <select id="genre-select" class="genre-select">
+                    <option value="all">Все жанры</option>
+                    <option value="pop">Поп</option>
+                    <option value="rock">Рок</option>
+                    <option value="jazz">Джаз</option>
+                    <option value="dance">Танцевальная</option>
+                    <option value="classical">Классическая</option>
+                </select>
+                <div class="sort-controls">
+                    <label class="sort-label">
+                        <input type="radio" name="sort" value="name" checked> По названию
+                    </label>
+                    <label class="sort-label">
+                        <input type="radio" name="sort" value="votes"> По популярности
+                    </label>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="refresh-button" class="action-button">🔄 Обновить список</button>
+                <button id="add-station-button" class="action-button">➕ Добавить станцию</button>
+            </div>
+        </div>
+
+        <!-- Status Message -->
+        <p id="status" class="status-message"></p>
 
         <!-- Radio List -->
         <div id="radio-list" class="radio-grid"></div>
+    </div>
+
+    <!-- Add Station Modal -->
+    <div id="add-station-modal" class="modal">
+        <div class="modal-content">
+            <h2>Добавить станцию</h2>
+            <form id="add-station-form">
+                <input type="text" id="station-name" placeholder="Название станции" required>
+                <input type="url" id="station-url" placeholder="URL потока" required>
+                <input type="text" id="station-genre" placeholder="Жанр">
+                <input type="text" id="station-country" placeholder="Страна">
+                <div class="modal-buttons">
+                    <button type="submit" class="submit-button">Добавить</button>
+                    <button type="button" class="cancel-button">Отмена</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Loading Overlay -->

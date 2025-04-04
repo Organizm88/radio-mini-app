@@ -1,162 +1,328 @@
 :root {
-    --bg-primary: #1C1C1C;
-    --bg-secondary: #2C2C2C;
-    --text-primary: #FFFFFF;
-    --text-secondary: #AAAAAA;
-    --accent-color: #0088CC;
-    --error-color: #FF4444;
-    --success-color: #44FF44;
+    --primary-color: #2481cc;
+    --secondary-color: #1c1c1e;
+    --text-color: #ffffff;
+    --background-color: #000000;
+    --card-background: #1c1c1e;
+    --hover-color: #2c2c2e;
+    --border-radius: 12px;
+    --spacing: 16px;
+    --player-height: 80px;
+    --categories-height: 56px;
 }
 
 body {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
 }
 
-/* Список радиостанций */
-.radio-grid {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+/* Player Styles */
+.player-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background-color: var(--secondary-color);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
-.radio-card {
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    padding: 12px;
+.player-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    padding: var(--spacing);
+    height: var(--player-height);
+    box-sizing: border-box;
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    flex: 1;
+}
+
+.station-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.station-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#current-station {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.playback-animation {
+    display: flex;
+    gap: 3px;
+    height: 16px;
+}
+
+.playback-animation .bar {
+    width: 3px;
+    background-color: var(--primary-color);
+    animation: sound 0ms -800ms linear infinite alternate;
+}
+
+.playback-animation .bar:nth-child(1) { animation-duration: 474ms; }
+.playback-animation .bar:nth-child(2) { animation-duration: 433ms; }
+.playback-animation .bar:nth-child(3) { animation-duration: 407ms; }
+
+@keyframes sound {
+    0% { height: 3px; }
+    100% { height: 16px; }
+}
+
+.player-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+}
+
+.control-button {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 24px;
     cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.control-button:hover {
+    background-color: var(--hover-color);
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#volume-slider {
+    width: 100px;
+    height: 4px;
+    -webkit-appearance: none;
+    background: var(--hover-color);
+    border-radius: 2px;
+}
+
+#volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* Categories Styles */
+.categories-container {
+    position: fixed;
+    top: var(--player-height);
+    left: 0;
+    right: 0;
+    z-index: 900;
+    background-color: var(--secondary-color);
+    border-bottom: 1px solid var(--hover-color);
+}
+
+.categories-scroll {
+    display: flex;
+    overflow-x: auto;
+    padding: 8px var(--spacing);
+    gap: 8px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    height: var(--categories-height);
+    box-sizing: border-box;
+}
+
+.categories-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.category-button {
+    background: var(--hover-color);
+    border: none;
+    color: var(--text-color);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.category-button.active {
+    background: var(--primary-color);
+}
+
+.category-button:hover:not(.active) {
+    background: #3c3c3e;
+}
+
+/* Content Styles */
+.content {
+    margin-top: calc(var(--player-height) + var(--categories-height));
+    padding: var(--spacing);
+}
+
+.radio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing);
+    padding-bottom: var(--spacing);
+}
+
+.radio-card {
+    background-color: var(--card-background);
+    border-radius: var(--border-radius);
+    padding: var(--spacing);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.radio-card:hover {
+    background-color: var(--hover-color);
+    transform: translateY(-2px);
 }
 
 .station-info {
     flex: 1;
-    margin-right: 12px;
+    min-width: 0;
 }
 
 .radio-name {
+    margin: 0 0 4px 0;
     font-size: 16px;
     font-weight: 600;
-    margin: 0 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .station-details {
-    font-size: 14px;
-    color: var(--text-secondary);
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    color: #8e8e93;
 }
 
 .play-button {
+    background: var(--primary-color);
+    border: none;
+    color: var(--text-color);
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    border: none;
-    background: var(--accent-color);
-    color: white;
-    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
 }
 
-/* Плеер */
-.player-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--bg-secondary);
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+.play-button:hover {
+    transform: scale(1.1);
+    background-color: #2b90e5;
 }
 
-#current-station {
-    font-size: 16px;
-    font-weight: 600;
-}
-
-/* Загрузка */
-#loading {
+/* Loading Overlay */
+.loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.7);
     display: none;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    z-index: 2000;
 }
 
 .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid var(--bg-secondary);
-    border-top: 4px solid var(--accent-color);
+    border: 4px solid var(--text-color);
+    border-top-color: var(--primary-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    to { transform: rotate(360deg); }
 }
 
-/* Уведомления */
+/* Notifications */
 .notification {
     position: fixed;
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%) translateY(100px);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
+    background-color: var(--secondary-color);
+    color: var(--text-color);
     padding: 12px 24px;
-    border-radius: 8px;
-    opacity: 0;
-    transition: all 0.3s ease;
+    border-radius: var(--border-radius);
+    z-index: 2000;
+    transition: transform 0.3s ease-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .notification.show {
     transform: translateX(-50%) translateY(0);
-    opacity: 1;
 }
 
 .notification.error {
-    background: var(--error-color);
+    background-color: #ff3b30;
 }
 
-.notification.success {
-    background: var(--success-color);
-    color: black;
+.notification.info {
+    background-color: var(--primary-color);
 }
 
-/* Адаптивность */
+/* Responsive Design */
 @media (max-width: 768px) {
     .radio-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .player-bar {
         padding: 12px;
     }
-    
-    .radio-card {
-        padding: 10px;
+
+    .station-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
     }
-    
-    .radio-name {
+
+    #current-station {
         font-size: 14px;
     }
-    
-    .station-details {
-        font-size: 12px;
-    }
-    
-    .play-button {
-        width: 36px;
-        height: 36px;
+
+    .volume-control {
+        display: none;
     }
 }

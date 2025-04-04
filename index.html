@@ -1,25 +1,60 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RadioTotBot</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="radio-grid" id="radio-list"></div>
-    
-    <div class="player-bar">
-        <div id="current-station">Выберите станцию</div>
-        <audio id="player"></audio>
+    <!-- Player Container -->
+    <div class="player-container">
+        <div class="player-bar">
+            <div class="player-info">
+                <div class="station-icon">🎵</div>
+                <div class="station-details">
+                    <div id="current-station">Select a station</div>
+                    <div class="playback-animation">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="player-controls">
+                <button class="control-button" id="prev-station">⏮</button>
+                <button class="control-button" id="play-pause">▶</button>
+                <button class="control-button" id="next-station">⏭</button>
+                <div class="volume-control">
+                    <button class="control-button" id="mute">🔊</button>
+                    <input type="range" id="volume-slider" min="0" max="100" value="100">
+                </div>
+            </div>
+        </div>
     </div>
-    
-    <div id="loading" style="display: none;">
+
+    <!-- Categories -->
+    <div class="categories-container">
+        <div class="categories-scroll" id="categories">
+            <!-- Categories will be dynamically added here -->
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+        <div class="radio-grid" id="radio-list">
+            <!-- Radio stations will be dynamically added here -->
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
         <div class="spinner"></div>
     </div>
-    
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Notifications -->
+    <div class="notification" id="notification"></div>
+
     <script src="script.js"></script>
 </body>
 </html>

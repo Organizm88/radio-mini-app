@@ -1,25 +1,65 @@
-// Audio player instance
-let audio = new Audio();
+'use strict';
+
+// =============================================
+// Telegram WebApp Init
+// =============================================
+const tg = window.Telegram?.WebApp;
+if (tg) {
+    tg.ready();
+    tg.expand();
+}
+
+// =============================================
+// Global State
+// =============================================
+const audio = new Audio();
 let currentStation = null;
 let isPlaying = false;
-let volume = 1;
 let isMuted = false;
-let isLoading = false;
+let volume = 0.8;
+let retryCount = 0;
+const MAX_RETRIES = 3;
+let retryTimer = null;
+let loadTimeout = null;
+let currentCategory = 'Все';
+let favorites = [];
+let searchDebounceTimer = null;
 
-// DOM elements
-const playerBar = document.querySelector('.player-bar');
-const currentStationElement = document.getElementById('current-station');
-const playPauseButton = document.getElementById('play-pause');
-const prevStationButton = document.getElementById('prev-station');
-const nextStationButton = document.getElementById('next-station');
-const muteButton = document.getElementById('mute');
-const volumeSlider = document.getElementById('volume-slider');
-const loadingOverlay = document.getElementById('loading');
-const notification = document.getElementById('notification');
-const categoriesContainer = document.getElementById('categories');
-const radioList = document.getElementById('radio-list');
+// =============================================
+// Category Emojis
+// =============================================
+const categoryEmojis = {
+    "Все": "🎵",
+    "❤️ Избранное": "❤️",
+    "Поп-музыка": "🎤",
+    "Рок-музыка": "🎸",
+    "Шансон и народная музыка": "🪗",
+    "Классическая музыка": "🎻",
+    "Джаз и блюз": "🎷",
+    "Электронная музыка": "💿",
+    "Ретро и ностальгия": "📻",
+    "Новости и Политика": "📰",
+    "Детские": "🧸",
+    "Религиозные": "⛪",
+    "Региональные": "🗺️",
+    "Зарубежные": "🌍",
+    "Разговорные": "🎙️",
+    "Москва и Московская область": "🏙️",
+    "Санкт-Петербург": "🌉",
+    "Сибирь": "🌲",
+    "Урал": "⛰️",
+    "Юг России": "☀️",
+    "Развлекательные": "🎭",
+    "Образовательные": "📚",
+    "Музыкальные": "🎼",
+    "Европа": "🇪🇺",
+    "Северная Америка": "🗽",
+    "Азия": "🏯"
+};
 
-// Radio stations data
+// =============================================
+// Radio Stations Data
+// =============================================
 const radioStations = {
     "Поп-музыка": [
         { 
@@ -1088,553 +1128,536 @@ const radioStations = {
     ]
 };
 
-// Add format support detection
-const audioFormats = {
-    canPlayType: (function() {
-        const audio = new Audio();
-        return {
-            mp3: audio.canPlayType('audio/mpeg').replace(/^no$/, ''),
-            aac: audio.canPlayType('audio/aac').replace(/^no$/, ''),
-            aacp: audio.canPlayType('audio/aacp').replace(/^no$/, ''),
-            ogg: audio.canPlayType('audio/ogg; codecs="vorbis"').replace(/^no$/, ''),
-            opus: audio.canPlayType('audio/ogg; codecs="opus"').replace(/^no$/, ''),
-            m3u8: audio.canPlayType('application/vnd.apple.mpegurl').replace(/^no$/, ''),
-            m3u: audio.canPlayType('audio/x-mpegurl').replace(/^no$/, '')
-        };
-    })()
-};
+// =============================================
+// Category icon helper
+// =============================================
+function getCategoryIcon(category) {
+    return categoryEmojis[category] || '🎵';
+}
 
-// Initialize the application
-function init() {
+// =============================================
+// Flatten all stations
+// =============================================
+function getAllStations() {
+    const all = [];
+    const seen = new Set();
+    for (const cat of Object.keys(radioStations)) {
+        for (const st of radioStations[cat]) {
+            const key = st.name + '|' + st.url;
+            if (!seen.has(key)) {
+                seen.add(key);
+                all.push({ ...st, category: cat });
+            }
+        }
+    }
+    return all;
+}
+
+// =============================================
+// Favorites
+// =============================================
+function loadFavorites() {
+    try {
+        const raw = localStorage.getItem('radioFavorites');
+        favorites = raw ? JSON.parse(raw) : [];
+    } catch {
+        favorites = [];
+    }
+}
+
+function saveFavorites() {
+    try {
+        localStorage.setItem('radioFavorites', JSON.stringify(favorites));
+    } catch {}
+}
+
+function isFavorite(station) {
+    return favorites.some(f => f.name === station.name && f.url === station.url);
+}
+
+function toggleFavorite(station, event) {
+    if (event) event.stopPropagation();
+    if (isFavorite(station)) {
+        favorites = favorites.filter(f => !(f.name === station.name && f.url === station.url));
+        showNotification('Удалено из избранного', 'info');
+    } else {
+        favorites.push(station);
+        showNotification('Добавлено в избранное', 'success');
+    }
+    saveFavorites();
+    // Refresh cards fav buttons
+    document.querySelectorAll('.fav-btn').forEach(btn => {
+        const name = btn.dataset.name;
+        const url = btn.dataset.url;
+        if (name && url) {
+            const st = { name, url };
+            btn.classList.toggle('active', isFavorite(st));
+            btn.title = isFavorite(st) ? 'Удалить из избранного' : 'Добавить в избранное';
+            btn.textContent = isFavorite(st) ? '♥' : '♡';
+        }
+    });
+    // Rebuild categories to show/hide favorites tab
     setupCategories();
-    displayRadioStations();
-    setupPlayerControls();
-    setupVolumeControls();
-    setupAudioEvents();
 }
 
-// Setup category buttons
+// =============================================
+// Categories
+// =============================================
 function setupCategories() {
-    const categories = Object.keys(radioStations);
-    categories.unshift("Все"); // Add "All" category
-    
-    const fragment = document.createDocumentFragment();
-    categories.forEach(category => {
-        const button = document.createElement('button');
-        button.className = 'category-button';
-        if (category === "Все") button.classList.add('active');
-        button.textContent = category;
-        button.dataset.category = category;
-        button.addEventListener('click', () => filterStations(category));
-        fragment.appendChild(button);
+    const scroll = document.getElementById('categories-scroll');
+    if (!scroll) return;
+    scroll.innerHTML = '';
+
+    const cats = ['Все'];
+    if (favorites.length > 0) cats.push('❤️ Избранное');
+    cats.push(...Object.keys(radioStations));
+
+    cats.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = 'category-btn' + (cat === currentCategory ? ' active' : '');
+        btn.innerHTML = `<span>${getCategoryIcon(cat)}</span><span>${cat}</span>`;
+        btn.addEventListener('click', () => filterStations(cat));
+        scroll.appendChild(btn);
     });
-    
-    const categoriesContainer = document.getElementById('categories');
-    categoriesContainer.innerHTML = '';
-    categoriesContainer.appendChild(fragment);
 }
 
-// Filter stations by category
 function filterStations(category) {
+    currentCategory = category;
+    // Clear search
+    const searchInput = document.getElementById('search-input');
+    const searchClear = document.getElementById('search-clear');
+    if (searchInput) searchInput.value = '';
+    if (searchClear) searchClear.classList.add('hidden');
+    document.getElementById('categories-wrap').classList.remove('hidden');
+
     // Update active category button
-    document.querySelectorAll('.category-button').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.category === category);
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.querySelector('span:last-child')?.textContent === category);
     });
 
-    // Get stations for the selected category
-    const stations = category === "Все" 
-        ? Object.values(radioStations).flat()
-        : radioStations[category] || [];
-    
-    // Display filtered stations
+    let stations;
+    if (category === 'Все') {
+        stations = getAllStations();
+    } else if (category === '❤️ Избранное') {
+        stations = favorites;
+    } else {
+        stations = (radioStations[category] || []).map(s => ({ ...s, category }));
+    }
+
     displayStations(stations);
 }
 
-// Display stations in the grid
-function displayStations(stations) {
-    const fragment = document.createDocumentFragment();
-    
-    if (stations.length === 0) {
-        const message = document.createElement('div');
-        message.className = 'no-stations';
-        message.textContent = 'No stations found in this category';
-        fragment.appendChild(message);
-    } else {
-        stations.forEach(station => {
-            const card = createStationCard(station);
-            fragment.appendChild(card);
-        });
+// =============================================
+// Search
+// =============================================
+function searchStations(query) {
+    const categoriesWrap = document.getElementById('categories-wrap');
+    const searchClear = document.getElementById('search-clear');
+
+    if (!query.trim()) {
+        searchClear.classList.add('hidden');
+        categoriesWrap.classList.remove('hidden');
+        filterStations(currentCategory);
+        return;
     }
-    
-    radioList.innerHTML = '';
-    radioList.appendChild(fragment);
+
+    searchClear.classList.remove('hidden');
+    categoriesWrap.classList.add('hidden');
+
+    const q = query.toLowerCase();
+    const results = getAllStations().filter(s => {
+        return s.name.toLowerCase().includes(q) ||
+            (s.tags && s.tags.some(tag => tag.toLowerCase().includes(q)));
+    });
+
+    displayStations(results, `Поиск: «${query}»`);
 }
 
-// Create station card element
+// =============================================
+// Display Stations
+// =============================================
+function displayStations(stations, title) {
+    const list = document.getElementById('radio-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (!stations || stations.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📻</div>
+                <div class="empty-state-text">Станции не найдены</div>
+                <div class="empty-state-sub">Попробуйте другой запрос или категорию</div>
+            </div>`;
+        return;
+    }
+
+    stations.forEach(station => {
+        const card = createStationCard(station);
+        list.appendChild(card);
+    });
+}
+
+// =============================================
+// Create Station Card
+// =============================================
 function createStationCard(station) {
     const card = document.createElement('div');
-    card.className = 'radio-card';
-    
+    const isActive = currentStation && currentStation.name === station.name && currentStation.url === station.url;
+    const isFav = isFavorite(station);
+    const icon = getCategoryIcon(station.category || currentCategory);
+
+    card.className = 'radio-card' + (isActive ? ' active' : '');
     card.innerHTML = `
-        <div class="station-info">
-            <h3 class="radio-name">${station.name}</h3>
-            <div class="station-details">${station.bitrate}</div>
+        <div class="card-icon">${icon}</div>
+        <div class="card-body">
+            <div class="card-name" title="${station.name}">${station.name}</div>
+            <div class="card-meta">
+                <span class="card-bitrate">${station.bitrate || ''}</span>
+                <span class="card-codec">${station.codec || ''}</span>
+                <div class="card-playing-badge">
+                    <div class="card-playing-waves">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                    В ЭФИРЕ
+                </div>
+            </div>
         </div>
-        <button class="play-button">▶</button>
-    `;
-    
-    const playButton = card.querySelector('.play-button');
-    playButton.addEventListener('click', () => playStation(station));
-    
+        <div class="card-actions">
+            <button class="fav-btn ${isFav ? 'active' : ''}" 
+                    data-name="${station.name}" 
+                    data-url="${station.url}" 
+                    title="${isFav ? 'Удалить из избранного' : 'Добавить в избранное'}">
+                ${isFav ? '♥' : '♡'}
+            </button>
+        </div>`;
+
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('.fav-btn')) return;
+        if (isActive && isPlaying) {
+            stopPlayback();
+        } else {
+            playStation(station);
+        }
+    });
+
+    card.querySelector('.fav-btn').addEventListener('click', (e) => {
+        toggleFavorite(station, e);
+    });
+
     return card;
 }
 
-// Setup player controls
-function setupPlayerControls() {
-    if (!playPauseButton) return;
-    
-    // Play/Pause button
-    playPauseButton.addEventListener('click', () => {
-        if (isPlaying) {
-            stopPlayback();
-        } else if (currentStation) {
-            startPlayback();
-        } else {
-            showNotification('Please select a station first', 'info');
+// =============================================
+// Player UI Update
+// =============================================
+function updatePlayerUI(station) {
+    const nameEl = document.getElementById('player-station-name');
+    const iconEl = document.getElementById('station-icon');
+    const onAirTag = document.getElementById('on-air-tag');
+    const soundWaves = document.getElementById('sound-waves');
+    const iconPlay = document.getElementById('icon-play');
+    const iconPause = document.getElementById('icon-pause');
+
+    if (station) {
+        nameEl.textContent = station.name;
+        iconEl.textContent = getCategoryIcon(station.category || currentCategory);
+    }
+
+    if (isPlaying) {
+        iconPlay.classList.add('hidden');
+        iconPause.classList.remove('hidden');
+        onAirTag.classList.add('visible');
+        soundWaves.classList.add('visible');
+        iconEl.classList.add('playing');
+    } else {
+        iconPlay.classList.remove('hidden');
+        iconPause.classList.add('hidden');
+        onAirTag.classList.remove('visible');
+        soundWaves.classList.remove('visible');
+        iconEl.classList.remove('playing');
+    }
+}
+
+function updatePlayingCards() {
+    document.querySelectorAll('.radio-card').forEach(card => {
+        const nameEl = card.querySelector('.card-name');
+        if (!nameEl) return;
+        const isActive = currentStation && nameEl.textContent === currentStation.name;
+        card.classList.toggle('active', isActive);
+    });
+}
+
+// =============================================
+// Playback
+// =============================================
+function playStation(station) {
+    if (!navigator.onLine) {
+        showNotification('Нет интернет-соединения', 'error');
+        return;
+    }
+
+    retryCount = 0;
+    attemptPlay(station);
+}
+
+function attemptPlay(station) {
+    clearTimeout(retryTimer);
+    clearTimeout(loadTimeout);
+
+    currentStation = station;
+    showLoadingOverlay(true);
+    showNotification('Загрузка...', 'info');
+
+    audio.pause();
+    audio.src = station.url;
+    audio.load();
+
+    loadTimeout = setTimeout(() => {
+        if (!isPlaying) {
+            showLoadingOverlay(false);
+            if (retryCount < MAX_RETRIES) {
+                retryCount++;
+                showNotification(`Ошибка загрузки станции. Попытка повтора... (${retryCount}/${MAX_RETRIES})`, 'warning');
+                retryTimer = setTimeout(() => attemptPlay(station), 2000);
+            } else {
+                showNotification('Таймаут загрузки. Проверьте подключение', 'error');
+                currentStation = null;
+                isPlaying = false;
+                updatePlayerUI(null);
+                updatePlayingCards();
+            }
         }
-    });
-    
-    // Update play/pause button state when audio state changes
-    audio.addEventListener('play', () => {
+    }, 15000);
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(err => {
+            // Handled by onerror event
+        });
+    }
+}
+
+function stopPlayback() {
+    clearTimeout(retryTimer);
+    clearTimeout(loadTimeout);
+    audio.pause();
+    isPlaying = false;
+    showLoadingOverlay(false);
+    showNotification('Остановлено', 'info');
+    updatePlayerUI(currentStation);
+    updatePlayingCards();
+}
+
+function startPlayback() {
+    if (!currentStation) {
+        showNotification('Выберите станцию', 'info');
+        return;
+    }
+    playStation(currentStation);
+}
+
+// =============================================
+// Audio Events (set up ONCE)
+// =============================================
+function setupAudioEvents() {
+    audio.volume = volume;
+
+    audio.addEventListener('playing', () => {
+        clearTimeout(loadTimeout);
         isPlaying = true;
-        updatePlayPauseButton();
+        retryCount = 0;
+        showLoadingOverlay(false);
+        showNotification(`Воспроизведение: ${currentStation?.name || ''}`, 'success');
+        updatePlayerUI(currentStation);
+        updatePlayingCards();
     });
-    
+
     audio.addEventListener('pause', () => {
         isPlaying = false;
-        updatePlayPauseButton();
+        updatePlayerUI(currentStation);
+        updatePlayingCards();
     });
-    
-    audio.addEventListener('error', handlePlaybackError);
-    audio.addEventListener('waiting', showLoading);
-    audio.addEventListener('canplay', hideLoading);
-    
-    // Add ended event listener to properly handle stream end
+
     audio.addEventListener('ended', () => {
-        stopPlayback();
+        isPlaying = false;
+        showLoadingOverlay(false);
+        updatePlayerUI(currentStation);
+        updatePlayingCards();
+    });
+
+    audio.addEventListener('waiting', () => {
+        showLoadingOverlay(true);
+    });
+
+    audio.addEventListener('canplay', () => {
+        showLoadingOverlay(false);
+    });
+
+    audio.addEventListener('error', () => {
+        clearTimeout(loadTimeout);
+        showLoadingOverlay(false);
+        isPlaying = false;
+
+        const err = audio.error;
+        if (err) {
+            const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
+            if (err.code === MEDIA_ERR_SRC_NOT_SUPPORTED && currentStation) {
+                const codec = currentStation.codec || 'неизвестный';
+                showNotification(`Формат ${codec} не поддерживается браузером`, 'error');
+                return;
+            }
+        }
+
+        if (retryCount < MAX_RETRIES && currentStation) {
+            retryCount++;
+            showNotification(`Ошибка загрузки станции. Попытка повтора... (${retryCount}/${MAX_RETRIES})`, 'warning');
+            retryTimer = setTimeout(() => attemptPlay(currentStation), 2000);
+        } else {
+            showNotification('Станция не доступна', 'error');
+            updatePlayerUI(currentStation);
+            updatePlayingCards();
+        }
+    });
+
+    audio.addEventListener('stalled', () => {
+        showLoadingOverlay(true);
     });
 }
 
-// Stop playback completely
-function stopPlayback() {
-    if (!audio) return;
-    
-    try {
-        audio.pause();
-        audio.currentTime = 0;
-        isPlaying = false;
-        isLoading = false;
-        updatePlayPauseButton();
-        hideLoading();
-        showNotification('Playback stopped', 'info');
-    } catch (error) {
-        console.error('Error stopping playback:', error);
-    }
+// =============================================
+// Loading Overlay
+// =============================================
+function showLoadingOverlay(show) {
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    overlay.classList.toggle('hidden', !show);
 }
 
-// Start playback
-function startPlayback() {
-    if (!currentStation || !audio) return;
-    
-    if (isLoading) {
-        showNotification('Please wait while the station is loading', 'info');
-        return;
-    }
-    
-    try {
-        const playPromise = audio.play();
-        
-        if (playPromise !== undefined) {
-            playPromise
-                .then(() => {
-                    isPlaying = true;
-                    updatePlayPauseButton();
-                    showNotification(`Playing: ${currentStation.name}`, 'info');
-                })
-                .catch(error => {
-                    handlePlaybackError(error);
-                });
-        }
-    } catch (error) {
-        handlePlaybackError(error);
-    }
-}
-
-// Toggle play/pause (updated)
-function togglePlayPause() {
-    if (!currentStation) {
-        showNotification('Please select a station first', 'info');
-        return;
-    }
-    
-    if (isLoading) {
-        showNotification('Please wait while the station is loading', 'info');
-        return;
-    }
-    
-    if (isPlaying) {
-        stopPlayback();
-    } else {
-        startPlayback();
-    }
-}
-
-// Setup volume controls
-function setupVolumeControls() {
-    // Set initial volume
-    audio.volume = volume;
-    volumeSlider.value = volume * 100;
-    updateMuteButton();
-    
-    // Volume slider change
-    volumeSlider.addEventListener('input', (e) => {
-        volume = e.target.value / 100;
-        audio.volume = volume;
-        updateMuteButton();
-        
-        if (volume > 0) {
-            isMuted = false;
-            audio.muted = false;
-        }
-    });
-    
-    // Mute button click
-    muteButton.addEventListener('click', toggleMute);
-}
-
-// Update play/pause button
-function updatePlayPauseButton() {
-    if (!playPauseButton) return;
-    playPauseButton.textContent = isPlaying ? '⏸' : '▶';
-}
-
-// Toggle mute
-function toggleMute() {
-    isMuted = !isMuted;
-    audio.muted = isMuted;
-    
-    if (isMuted) {
-        audio.volume = 0;
-        volumeSlider.value = 0;
-    } else {
-        audio.volume = volume;
-        volumeSlider.value = volume * 100;
-    }
-    
-    updateMuteButton();
-}
-
-// Update mute button
-function updateMuteButton() {
-    if (isMuted || volume === 0) {
-        muteButton.textContent = '🔇';
-    } else if (volume < 0.5) {
-        muteButton.textContent = '🔈';
-    } else {
-        muteButton.textContent = '🔊';
-    }
-}
-
-// Show loading overlay
-function showLoading() {
-    loadingOverlay.style.display = 'flex';
-}
-
-// Hide loading overlay
-function hideLoading() {
-    loadingOverlay.style.display = 'none';
-}
-
-// Enhanced error handling with format-specific messages
-function handlePlaybackError(error) {
-    console.error('Playback error:', error);
-    hideLoading();
-    isLoading = false;
-    
-    let message = 'Error playing station';
-    
-    if (!navigator.onLine) {
-        message = 'No internet connection';
-    } else if (error.name === 'NotSupportedError') {
-        const codec = currentStation?.codec || 'Unknown';
-        message = `Audio format ${codec} not supported by your browser`;
-    } else if (error.name === 'NotAllowedError') {
-        message = 'Playback not allowed';
-    } else if (error.message === 'Loading timeout') {
-        message = 'Station loading timeout';
-    } else if (error.name === 'AbortError') {
-        message = 'Playback aborted';
-    } else if (error.name === 'MediaError') {
-        switch(error.code) {
-            case 1:
-                message = 'Stream loading aborted';
-                break;
-            case 2:
-                message = 'Network error while loading stream';
-                break;
-            case 3:
-                message = `Error decoding ${currentStation?.codec || 'audio'} stream`;
-                break;
-            case 4:
-                message = `Stream format ${currentStation?.codec || ''} not supported`;
-                break;
-        }
-    }
-    
-    showNotification(message, 'error');
-    
-    if (currentStation) {
-        isPlaying = false;
-        updatePlayPauseButton();
-    }
-}
-
-// Show notification with auto-hide
-function showNotification(message, type = 'info') {
-    const notification = document.getElementById('notification');
-    
-    // Clear any existing timeout
-    if (notification.hideTimeout) {
-        clearTimeout(notification.hideTimeout);
-    }
-    
-    // Update notification
-    notification.textContent = message;
-    notification.className = `notification ${type}`;
-    notification.classList.add('show');
-    
-    // Auto-hide after delay
-    notification.hideTimeout = setTimeout(() => {
-        notification.classList.remove('show');
+// =============================================
+// Notification
+// =============================================
+let notificationTimer = null;
+function showNotification(message, type = '') {
+    const el = document.getElementById('notification');
+    if (!el) return;
+    clearTimeout(notificationTimer);
+    el.textContent = message;
+    el.className = `notification ${type}`;
+    // Force reflow for animation restart
+    void el.offsetWidth;
+    el.classList.add('show');
+    notificationTimer = setTimeout(() => {
+        el.classList.remove('show');
     }, 3000);
 }
 
-// Enhanced audio events setup
-function setupAudioEvents() {
-    audio.addEventListener('ended', () => {
-        isPlaying = false;
-        updatePlayPauseButton();
-        showNotification('Stream ended', 'info');
-    });
-    
-    audio.addEventListener('error', (e) => {
-        isPlaying = false;
-        isLoading = false;
-        handlePlaybackError(e.error || new Error('Audio error'));
-    });
-    
-    audio.addEventListener('waiting', () => {
-        isLoading = true;
-        showLoading();
-    });
-    
-    audio.addEventListener('playing', () => {
-        isLoading = false;
-        hideLoading();
-        isPlaying = true;
-        updatePlayPauseButton();
-    });
-    
-    audio.addEventListener('canplay', () => {
-        isLoading = false;
-        hideLoading();
-    });
-    
-    audio.addEventListener('pause', () => {
-        isPlaying = false;
-        updatePlayPauseButton();
-    });
-    
-    audio.addEventListener('play', () => {
-        isPlaying = true;
-        updatePlayPauseButton();
-    });
-    
-    audio.addEventListener('stalled', () => {
-        isLoading = true;
-        showLoading();
-    });
-    
-    audio.addEventListener('suspend', () => {
-        isLoading = false;
-        hideLoading();
-    });
-    
-    // Add buffering detection
-    let lastPlayPos = 0;
-    let currentPlayPos = 0;
-    let bufferingDetected = false;
-    
-    const checkBuffering = setInterval(() => {
-        currentPlayPos = audio.currentTime;
-        
-        // Check if position has changed
-        const offset = 1 / 50;
-        if (!bufferingDetected && currentPlayPos < (lastPlayPos + offset) && !audio.paused) {
-            showLoading();
-            bufferingDetected = true;
-        }
-        
-        // Check if buffering has ended
-        if (bufferingDetected && currentPlayPos > (lastPlayPos + offset) && !audio.paused) {
-            hideLoading();
-            bufferingDetected = false;
-        }
-        
-        lastPlayPos = currentPlayPos;
-    }, 100);
+// =============================================
+// Telegram Theme
+// =============================================
+function applyTelegramTheme() {
+    if (!tg || !tg.themeParams) return;
+    const p = tg.themeParams;
+    const root = document.documentElement;
+    const set = (v, k) => v && root.style.setProperty(k, v);
+
+    set(p.bg_color, '--tg-theme-bg-color');
+    set(p.text_color, '--tg-theme-text-color');
+    set(p.hint_color, '--tg-theme-hint-color');
+    set(p.button_color, '--tg-theme-button-color');
+    set(p.button_text_color, '--tg-theme-button-text-color');
+    set(p.secondary_bg_color, '--tg-theme-secondary-bg-color');
+    if (p.button_color) {
+        root.style.setProperty('--accent', p.button_color);
+    }
+    if (p.secondary_bg_color) {
+        root.style.setProperty('--card-bg', p.secondary_bg_color);
+    }
 }
 
-// Enhanced playStation function
-function playStation(station) {
-    if (!station || !station.url) {
-        showNotification('Invalid station data', 'error');
-        return;
-    }
-    
-    // Check internet connection
-    if (!navigator.onLine) {
-        showNotification('No internet connection', 'error');
-        return;
-    }
-    
-    // If clicking the same station that's currently playing, stop it
-    if (currentStation && currentStation.url === station.url && isPlaying) {
-        stopPlayback();
-        return;
-    }
-    
-    // Start loading
-    isLoading = true;
-    showLoading();
-    
-    try {
-        // Stop current playback if any
-        if (audio.src) {
+// =============================================
+// Init
+// =============================================
+function init() {
+    if (tg) applyTelegramTheme();
+
+    loadFavorites();
+    setupCategories();
+    setupAudioEvents();
+
+    // Initial display — all stations
+    filterStations('Все');
+
+    // Play/Pause button
+    document.getElementById('btn-play-pause').addEventListener('click', () => {
+        if (isPlaying) {
             stopPlayback();
-        }
-        
-        // Create new Audio element for each stream
-        audio = new Audio();
-        
-        // Set audio attributes
-        audio.crossOrigin = "anonymous";
-        audio.preload = "auto";
-        
-        // Check format support
-        const codec = station.codec.toLowerCase();
-        const isSupported = checkCodecSupport(codec);
-        
-        if (!isSupported) {
-            showNotification(`Warning: ${station.codec} format may not be fully supported by your browser`, 'warning');
-        }
-        
-        // Add format-specific optimizations
-        if (codec === 'aac' || codec === 'aac+' || codec === 'aacp') {
-            audio.mozAudioChannelType = 'content';
-        }
-        
-        // Set up error recovery
-        setupErrorRecovery(station);
-        
-        // Set up enhanced audio events
-        setupAudioEvents();
-        
-        // Configure audio settings
-        audio.volume = volume;
-        audio.muted = isMuted;
-        
-        currentStation = station;
-        audio.src = station.url;
-        
-        // Force load the audio
-        audio.load();
-        
-        // Update UI
-        currentStationElement.textContent = station.name;
-        
-        // Attempt to play with timeout
-        const playPromise = audio.play();
-        
-        // Set a timeout for the initial loading
-        const loadingTimeout = setTimeout(() => {
-            if (isLoading) {
-                stopPlayback();
-                handlePlaybackError(new Error('Loading timeout'));
-            }
-        }, 10000);
-        
-        if (playPromise !== undefined) {
-            playPromise
-                .then(() => {
-                    clearTimeout(loadingTimeout);
-                    isLoading = false;
-                    hideLoading();
-                    isPlaying = true;
-                    updatePlayPauseButton();
-                    showNotification(`Playing: ${station.name} (${station.codec} ${station.bitrate})`, 'info');
-                })
-                .catch(error => {
-                    clearTimeout(loadingTimeout);
-                    handlePlaybackError(error);
-                });
-        }
-    } catch (error) {
-        handlePlaybackError(error);
-    }
-}
-
-// Setup error recovery
-function setupErrorRecovery(station) {
-    let errorRetryCount = 0;
-    const maxRetries = 3;
-    
-    audio.onerror = function(e) {
-        console.error('Audio error:', e);
-        if (errorRetryCount < maxRetries) {
-            errorRetryCount++;
-            console.log(`Retrying playback (attempt ${errorRetryCount})`);
-            
-            setTimeout(() => {
-                if (currentStation === station) {
-                    audio.load();
-                    audio.play().catch(handlePlaybackError);
-                }
-            }, 1000);
         } else {
-            handlePlaybackError(e);
+            startPlayback();
         }
-    };
+    });
+
+    // Mute button
+    const btnMute = document.getElementById('btn-mute');
+    const iconVol = document.getElementById('icon-vol');
+    const iconMute = document.getElementById('icon-mute');
+    btnMute.addEventListener('click', () => {
+        isMuted = !isMuted;
+        audio.muted = isMuted;
+        btnMute.classList.toggle('muted', isMuted);
+        iconVol.classList.toggle('hidden', isMuted);
+        iconMute.classList.toggle('hidden', !isMuted);
+    });
+
+    // Volume slider
+    const volSlider = document.getElementById('volume-slider');
+    volSlider.value = Math.round(volume * 100);
+    volSlider.addEventListener('input', () => {
+        volume = volSlider.value / 100;
+        audio.volume = volume;
+        if (volume === 0) {
+            isMuted = true;
+            audio.muted = true;
+            btnMute.classList.add('muted');
+            iconVol.classList.add('hidden');
+            iconMute.classList.remove('hidden');
+        } else if (isMuted) {
+            isMuted = false;
+            audio.muted = false;
+            btnMute.classList.remove('muted');
+            iconVol.classList.remove('hidden');
+            iconMute.classList.add('hidden');
+        }
+    });
+
+    // Search input
+    const searchInput = document.getElementById('search-input');
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            searchStations(searchInput.value);
+        }, 300);
+    });
+
+    // Search clear
+    document.getElementById('search-clear').addEventListener('click', () => {
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input'));
+        searchInput.focus();
+    });
+
+    // Offline/online events
+    window.addEventListener('offline', () => {
+        showNotification('Нет интернет-соединения', 'error');
+        if (isPlaying) stopPlayback();
+    });
+    window.addEventListener('online', () => {
+        showNotification('Подключение восстановлено', 'success');
+    });
+
+    // Update player bar initial state
+    updatePlayerUI(null);
 }
 
-// Check codec support
-function checkCodecSupport(codec) {
-    codec = codec.toLowerCase();
-    switch (codec) {
-        case 'mp3':
-            return audioFormats.canPlayType.mp3;
-        case 'aac':
-        case 'aac+':
-        case 'aacp':
-            return audioFormats.canPlayType.aac || audioFormats.canPlayType.aacp;
-        case 'ogg':
-            return audioFormats.canPlayType.ogg;
-        case 'opus':
-            return audioFormats.canPlayType.opus;
-        default:
-            return false;
-    }
-}
-
-// Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', init);

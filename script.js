@@ -1,1663 +1,607 @@
-'use strict';
+// ============================================================
+//  RadioTotBot — Telegram Mini App   (Spotify-style)
+// ============================================================
 
-// =============================================
-// Telegram WebApp Init
-// =============================================
+// ---- Telegram SDK ----
 const tg = window.Telegram?.WebApp;
-if (tg) {
-    tg.ready();
-    tg.expand();
-}
+if (tg) { tg.ready(); tg.expand(); }
 
-// =============================================
-// Global State
-// =============================================
+// ---- Audio & State ----
 const audio = new Audio();
+audio.preload = 'none';
 let currentStation = null;
 let isPlaying = false;
 let isMuted = false;
-let volume = 0.8;
-let retryCount = 0;
-const MAX_RETRIES = 3;
-let retryTimer = null;
-let loadTimeout = null;
+let volume = 1;
 let currentCategory = 'Все';
 let favorites = [];
-let searchDebounceTimer = null;
+let stationList = [];   // currently visible flat list
+let stationIdx = -1;    // index in stationList
+let searchTimer = null;
+let retryCount = 0;
+let loadTimer = null;
 
-// =============================================
-// Category Emojis
-// =============================================
-const categoryEmojis = {
-    "Все": "🎵",
-    "❤️ Избранное": "❤️",
-    "Поп-музыка": "🎤",
-    "Рок-музыка": "🎸",
-    "Шансон и народная музыка": "🪗",
-    "Классическая музыка": "🎻",
-    "Джаз и блюз": "🎷",
-    "Электронная музыка": "💿",
-    "Ретро и ностальгия": "📻",
-    "Новости и Политика": "📰",
-    "Детские": "🧸",
-    "Религиозные": "⛪",
-    "Региональные": "🗺️",
-    "Зарубежные": "🌍",
-    "Разговорные": "🎙️",
-    "Москва и Московская область": "🏙️",
-    "Санкт-Петербург": "🌉",
-    "Сибирь": "🌲",
-    "Урал": "⛰️",
-    "Юг России": "☀️",
-    "Развлекательные": "🎭",
-    "Образовательные": "📚",
-    "Музыкальные": "🎼",
-    "Европа": "🇪🇺",
-    "Северная Америка": "🗽",
-    "Азия": "🏯"
+// ---- Gradients ----
+const GRADS = [
+    'linear-gradient(135deg,#667eea,#764ba2)',
+    'linear-gradient(135deg,#f093fb,#f5576c)',
+    'linear-gradient(135deg,#4facfe,#00f2fe)',
+    'linear-gradient(135deg,#43e97b,#38f9d7)',
+    'linear-gradient(135deg,#fa709a,#fee140)',
+    'linear-gradient(135deg,#a18cd1,#fbc2eb)',
+    'linear-gradient(135deg,#fccb90,#d57eeb)',
+    'linear-gradient(135deg,#e0c3fc,#8ec5fc)',
+];
+function grad(n){let h=0;for(let i=0;i<n.length;i++)h=n.charCodeAt(i)+((h<<5)-h);return GRADS[Math.abs(h)%GRADS.length]}
+function initials(n){return n.split(/[\s\-]+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'📻'}
+
+// ---- Category Emojis ----
+const catEmoji = {
+    "Все":"🎵","Поп-музыка":"🎤","Рок-музыка":"🎸","Шансон и народная музыка":"🪗",
+    "Классическая музыка":"🎻","Джаз и блюз":"🎷","Электронная музыка":"💿",
+    "Ретро и ностальгия":"📻","Новости и Политика":"📰","Детские":"🧸",
+    "Религиозные":"⛪","Региональные":"🗺️","Зарубежные":"🌍","Разговорные":"🎙️",
+    "Москва и Московская область":"🏙️","Санкт-Петербург":"🌉","Сибирь":"🌲",
+    "Урал":"⛰️","Юг России":"☀️","Развлекательные":"🎭","Образовательные":"📚",
+    "Музыкальные":"🎼","Европа":"🇪🇺","Северная Америка":"🗽","Азия":"🏯"
 };
 
-// =============================================
-// Radio Stations Data
-// =============================================
+// ============================================================
+//  RADIO STATIONS  (all http → https)
+// ============================================================
 const radioStations = {
     "Поп-музыка": [
-        { 
-            name: "Русское Радио", 
-            url: "http://rusradio.hostingradio.ru/rusradio96.aacp", 
-            bitrate: "96 kbps",
-            codec: "AAC+",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "хиты", "российская музыка"]
-        },
-        { 
-            name: "Европа Плюс", 
-            url: "http://ep128.hostingradio.ru:8030/ep128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "хиты", "европейская музыка"]
-        },
-        { 
-            name: "Love Radio", 
-            url: "http://stream.loveradio.ru/12_love_24", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "любовные песни"]
-        },
-        { 
-            name: "Радио Energy", 
-            url: "http://ic6.101.ru:8000/stream/pro/aac/64/99", 
-            bitrate: "64 kbps",
-            codec: "AAC",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "танцевальная музыка"]
-        },
-        { 
-            name: "DFM", 
-            url: "http://dfm.hostingradio.ru/dfm96.aacp", 
-            bitrate: "96 kbps",
-            codec: "AAC+",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "танцевальная музыка"]
-        },
-        { 
-            name: "Хит FM", 
-            url: "http://hitfm.hostingradio.ru/hitfm96.aacp", 
-            bitrate: "96 kbps",
-            codec: "AAC+",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "хиты"]
-        },
-        { 
-            name: "Радио Maximum", 
-            url: "https://maximum.hostingradio.ru/maximum96.aacp", 
-            bitrate: "96 kbps",
-            codec: "AAC+",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "рок", "альтернатива"]
-        },
-        { 
-            name: "Like FM", 
-            url: "http://likefm.hostingradio.ru:8015/likefm128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "хиты"]
-        },
-        { 
-            name: "Новое Радио", 
-            url: "http://icecast-newradio.cdnvideo.ru/newradio3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "новые хиты"]
-        },
-        { 
-            name: "Радио Дача", 
-            url: "http://stream.radiodacha.ru/14_dacha_24", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["поп", "ретро", "народная музыка"]
-        }
+        {name:"Русское Радио",url:"https://rusradio.hostingradio.ru/rusradio96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["поп","хиты"]},
+        {name:"Европа Плюс",url:"https://ep128.hostingradio.ru:8030/ep128",bitrate:"128 kbps",codec:"MP3",tags:["поп","хиты"]},
+        {name:"Love Radio",url:"https://lovefm.hostingradio.ru/lovelive",bitrate:"128 kbps",codec:"MP3",tags:["поп","любовные песни"]},
+        {name:"Радио Energy",url:"https://pub0302.101.ru:8443/stream/air/aac/64/99",bitrate:"64 kbps",codec:"AAC",tags:["поп","танцевальная"]},
+        {name:"DFM",url:"https://dfm.hostingradio.ru/dfm96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["поп","танцевальная"]},
+        {name:"Хит FM",url:"https://hitfm.hostingradio.ru/hitfm96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["поп","хиты"]},
+        {name:"Радио Maximum",url:"https://maximum.hostingradio.ru/maximum96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["поп","рок"]},
+        {name:"Like FM",url:"https://likefm.hostingradio.ru:8015/likefm128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["поп","хиты"]},
+        {name:"Новое Радио",url:"https://icecast-newradio.cdnvideo.ru/newradio3",bitrate:"128 kbps",codec:"MP3",tags:["поп","новые хиты"]},
+        {name:"Радио Дача",url:"https://stream.radiodacha.ru/14_dacha_24",bitrate:"128 kbps",codec:"MP3",tags:["поп","ретро"]}
     ],
     "Рок-музыка": [
-        { 
-            name: "Наше Радио", 
-            url: "http://nashe.hostingradio.ru/nashe-128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["рок", "русский рок"]
-        },
-        { 
-            name: "Radio ROKS", 
-            url: "http://online.radioroks.ua/RadioROKS", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Ukraine",
-            language: "Русский",
-            tags: ["рок", "классический рок"]
-        },
-        { 
-            name: "Ultra", 
-            url: "https://ultramp3.hostingradio.ru:8443/ultra320.mp3", 
-            bitrate: "320 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["рок", "альтернатива"]
-        },
-        { 
-            name: "Rock FM", 
-            url: "http://nashe2.hostingradio.ru/rock-128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["рок", "классический рок"]
-        },
-        { 
-            name: "ROCK Radio", 
-            url: "http://rockradio.hostingradio.ru:8000/rockradio128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["рок", "хард-рок"]
-        },
-        { 
-            name: "Эхо Москвы", 
-            url: "https://streams.echo.msk.ru/echo.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["рок", "разговорное радио"]
-        },
-        { 
-            name: "Радио Би Коста", 
-            url: "http://bicoste.ru:8000/radio", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["рок", "альтернатива"]
-        }
+        {name:"Наше Радио",url:"https://nashe.hostingradio.ru/nashe-128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["рок","русский рок"]},
+        {name:"Ultra",url:"https://ultramp3.hostingradio.ru:8443/ultra320.mp3",bitrate:"320 kbps",codec:"MP3",tags:["рок","альтернатива"]},
+        {name:"Rock FM",url:"https://nashe2.hostingradio.ru/rock-128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["рок","классический рок"]},
+        {name:"Радио Maximum",url:"https://maximum.hostingradio.ru/maximum96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["рок","альтернатива"]}
     ],
     "Шансон и народная музыка": [
-        { 
-            name: "Радио Шансон", 
-            url: "http://chanson.hostingradio.ru:8041/chanson128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["шансон", "блатная песня"]
-        },
-        { 
-            name: "Радио Ваня", 
-            url: "http://icecast-radiovanya.cdnvideo.ru/radiovanya", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["шансон", "народная музыка"]
-        },
-        { 
-            name: "Радио Дача", 
-            url: "http://stream.radiodacha.ru/14_dacha_24", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["шансон", "народная музыка", "ретро"]
-        },
-        { 
-            name: "Милицейская Волна", 
-            url: "http://radiomv.hostingradio.ru/radiomv128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["шансон", "блатная песня"]
-        },
-        { 
-            name: "Кабриолет FM", 
-            url: "http://setmedia.ru:8000/high3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["шансон", "ретро"]
-        }
+        {name:"Радио Шансон",url:"https://chanson.hostingradio.ru:8041/chanson128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["шансон"]},
+        {name:"Радио Дача",url:"https://stream.radiodacha.ru/14_dacha_24",bitrate:"128 kbps",codec:"MP3",tags:["шансон","ретро"]},
+        {name:"Милицейская Волна",url:"https://radiomv.hostingradio.ru/radiomv128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["шансон"]}
     ],
     "Классическая музыка": [
-        { 
-            name: "Радио Орфей", 
-            url: "http://orfeyfm.hostingradio.ru:8034/orfeyfm192.mp3", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["классика", "академическая музыка"]
-        },
-        { 
-            name: "Радио Классик", 
-            url: "http://streams.radioclassica.ru:8000/rclassica", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["классика", "симфоническая музыка"]
-        },
-        { 
-            name: "Classical Radio", 
-            url: "http://stream.srg-ssr.ch/m/rsc_de/mp3_128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Switzerland",
-            language: "Немецкий",
-            tags: ["классика", "европейская классика"]
-        },
-        { 
-            name: "Радио Культура", 
-            url: "https://icecast-vgtrk.cdnvideo.ru/kulturafm_mp3_192kbps", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["классика", "культура"]
-        }
+        {name:"Радио Орфей",url:"https://orfeyfm.hostingradio.ru:8034/orfeyfm192.mp3",bitrate:"192 kbps",codec:"MP3",tags:["классика"]},
+        {name:"Радио Культура",url:"https://icecast-vgtrk.cdnvideo.ru/kulturafm_mp3_192kbps",bitrate:"192 kbps",codec:"MP3",tags:["классика","культура"]}
     ],
     "Джаз и блюз": [
-        { 
-            name: "Радио Джаз", 
-            url: "http://jazzradio.hostingradio.ru/jazzradio128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["джаз", "блюз"]
-        },
-        { 
-            name: "Jazz FM", 
-            url: "http://jfm1.hostingradio.ru:14536/ijstream.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["джаз", "современный джаз"]
-        },
-        { 
-            name: "Серебряный Дождь", 
-            url: "http://silver.hostingradio.ru:8035/silver128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["джаз", "разговорное радио"]
-        }
+        {name:"Радио Джаз",url:"https://jazzradio.hostingradio.ru/jazzradio128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["джаз","блюз"]},
+        {name:"Серебряный Дождь",url:"https://silver.hostingradio.ru:8035/silver128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["джаз"]}
     ],
     "Электронная музыка": [
-        { 
-            name: "DFM", 
-            url: "http://dfm.hostingradio.ru/dfm96.aacp", 
-            bitrate: "96 kbps",
-            codec: "AAC+",
-            country: "Russia",
-            language: "Русский",
-            tags: ["электроника", "танцевальная музыка", "поп"]
-        },
-        { 
-            name: "Record", 
-            url: "http://air.radiorecord.ru:8101/rr_320", 
-            bitrate: "320 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["электроника", "танцевальная музыка"]
-        },
-        { 
-            name: "Megapolis FM", 
-            url: "http://stream04.media.rambler.ru/megapolis128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["электроника", "поп"]
-        },
-        { 
-            name: "Радио Energy", 
-            url: "http://ic6.101.ru:8000/stream/pro/aac/64/99", 
-            bitrate: "64 kbps",
-            codec: "AAC",
-            country: "Russia",
-            language: "Русский",
-            tags: ["электроника", "танцевальная музыка", "поп"]
-        },
-        { 
-            name: "Kissfm", 
-            url: "https://online.kissfm.ua/KissFM", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Ukraine",
-            language: "Русский",
-            tags: ["электроника", "поп"]
-        },
-        { 
-            name: "Promodj Radio", 
-            url: "http://radio.promodj.com:8000/premium-192", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "International",
-            language: "Русский",
-            tags: ["электроника", "диджейская музыка"]
-        }
+        {name:"DFM",url:"https://dfm.hostingradio.ru/dfm96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["электроника","танцевальная"]},
+        {name:"Record",url:"https://air.radiorecord.ru:8101/rr_320",bitrate:"320 kbps",codec:"MP3",tags:["электроника","танцевальная"]},
+        {name:"KissFM",url:"https://online.kissfm.ua/KissFM",bitrate:"128 kbps",codec:"MP3",tags:["электроника","поп"]},
+        {name:"Радио Energy",url:"https://pub0302.101.ru:8443/stream/air/aac/64/99",bitrate:"64 kbps",codec:"AAC",tags:["электроника","поп"]}
     ],
     "Ретро и ностальгия": [
-        { 
-            name: "Ретро FM", 
-            url: "http://retroserver.streamr.ru:8043/retro256.mp3", 
-            bitrate: "256 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["ретро", "советская музыка", "ностальгия"]
-        },
-        { 
-            name: "Радио Дача", 
-            url: "http://stream.radiodacha.ru/14_dacha_24", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["ретро", "народная музыка", "ностальгия"]
-        },
-        { 
-            name: "Милицейская Волна", 
-            url: "http://radiomv.hostingradio.ru/radiomv128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["ретро", "шансон", "ностальгия"]
-        },
-        { 
-            name: "Радио Мелодия", 
-            url: "http://stream128.melodiafm.spb.ru:8000/melodia128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["ретро", "советская музыка", "ностальгия"]
-        },
-        { 
-            name: "Радио 7 на семи холмах", 
-            url: "https://radio7.hostingradio.ru:8040/radio7128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["ретро", "советская музыка", "ностальгия"]
-        }
+        {name:"Ретро FM",url:"https://retro.hostingradio.ru/retro256.mp3",bitrate:"256 kbps",codec:"MP3",tags:["ретро","ностальгия"]},
+        {name:"Радио Дача",url:"https://stream.radiodacha.ru/14_dacha_24",bitrate:"128 kbps",codec:"MP3",tags:["ретро","народная"]},
+        {name:"Радио 7 на семи холмах",url:"https://radio7.hostingradio.ru:8040/radio7128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["ретро","ностальгия"]},
+        {name:"Милицейская Волна",url:"https://radiomv.hostingradio.ru/radiomv128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["ретро","шансон"]}
     ],
     "Новости и Политика": [
-        { 
-            name: "Вести FM", 
-            url: "https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_192kbps", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["новости", "политика"]
-        },
-        { 
-            name: "Эхо Москвы", 
-            url: "https://streams.echo.msk.ru/echo.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["новости", "политика", "разговорное радио"]
-        },
-        { 
-            name: "Радио Свобода", 
-            url: "http://rfe-channel-01.akacast.akamaistream.net/7/371/229652/v1/ibb.akacast.akamaistream.net/rfe_channel_01.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Czechia",
-            language: "Русский",
-            tags: ["новости", "политика"]
-        },
-        { 
-            name: "Комсомольская Правда", 
-            url: "https://kpradio.hostingradio.ru:8000/128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["новости", "разговорное радио"]
-        },
-        { 
-            name: "Говорит Москва", 
-            url: "http://media.govoritmoskva.ru:8000/rufm.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["новости", "разговорное радио"]
-        },
-        { 
-            name: "Бизнес FM", 
-            url: "http://bfm.hostingradio.ru:8004/fm", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["новости", "бизнес", "экономика"]
-        },
-        { 
-            name: "Радио Маяк", 
-            url: "https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_192kbps", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["новости", "разговорное радио"]
-        }
+        {name:"Вести FM",url:"https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_192kbps",bitrate:"192 kbps",codec:"MP3",tags:["новости","политика"]},
+        {name:"Комсомольская Правда",url:"https://kpradio.hostingradio.ru:8000/128",bitrate:"128 kbps",codec:"MP3",tags:["новости"]},
+        {name:"Радио Маяк",url:"https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_192kbps",bitrate:"192 kbps",codec:"MP3",tags:["новости"]},
+        {name:"Бизнес FM",url:"https://bfm.hostingradio.ru:8004/fm",bitrate:"128 kbps",codec:"MP3",tags:["новости","бизнес"]}
     ],
     "Детские": [
-        { 
-            name: "Детское радио", 
-            url: "http://edu.detifm.ru:8000/deti-radio", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["детское", "образовательное"]
-        },
-        { 
-            name: "Радио Kids FM", 
-            url: "http://radiokidsfm.ru:8000/stream", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["детское", "развлекательное"]
-        },
-        { 
-            name: "Радио Гном", 
-            url: "http://radio.gnomradio.com:8000/live128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["детское", "сказки"]
-        },
-        { 
-            name: "Радио Disney Россия", 
-            url: "http://disney2.streamr.ru:8060/disney", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["детское", "мультфильмы"]
-        }
-    ],
-    "Религиозные": [
-        { 
-            name: "Радио Вера", 
-            url: "http://radiovera.hostingradio.ru:8007/radiovera_128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["религиозное", "православие", "духовное"]
-        },
-        { 
-            name: "Радонеж", 
-            url: "http://icecast.radonezh.cdnvideo.ru:8000/rad128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["религиозное", "православие", "духовное"]
-        },
-        { 
-            name: "Православное радио", 
-            url: "http://radio-spas.ru:8000/Radio-Spas", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["религиозное", "православие", "духовное"]
-        },
-        { 
-            name: "Радио Maria", 
-            url: "http://dreamsiteradiocp.com:8032/stream", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "International",
-            language: "Русский",
-            tags: ["религиозное", "католицизм", "духовное"]
-        }
-    ],
-    "Региональные": [
-        { 
-            name: "Москва FM", 
-            url: "http://icecast.vgtrk.cdnvideo.ru/moscowfm128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["москва", "региональное"]
-        },
-        { 
-            name: "Радио Петербург", 
-            url: "http://www.5-tv.ru/radio/radio.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["санкт-петербург", "региональное"]
-        },
-        { 
-            name: "Радио Сибирь", 
-            url: "http://radiosibir.ru:8090/HQ", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["сибирь", "региональное"]
-        },
-        { 
-            name: "Радио Екатеринбург", 
-            url: "http://stream.radioekb.ru:8000/radioekb", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["урал", "региональное"]
-        }
-    ],
-    "Зарубежные": [
-        { 
-            name: "Русское Радио Европа", 
-            url: "http://s0.radioheart.ru:8000/RH20733", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Europe",
-            language: "Русский",
-            tags: ["зарубежное", "европа"]
-        },
-        { 
-            name: "Русский Берлин", 
-            url: "http://rb-stream.de:8000/stream.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Germany",
-            language: "Русский",
-            tags: ["зарубежное", "германия"]
-        },
-        { 
-            name: "Наше Радио Нью-Йорк", 
-            url: "http://nashe1.hostingradio.ru/nasheny128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "USA",
-            language: "Русский",
-            tags: ["зарубежное", "сша"]
-        },
-        { 
-            name: "Русское Радио Азия", 
-            url: "http://stream.rusradio.asia:8000/rra128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Asia",
-            language: "Русский",
-            tags: ["зарубежное", "азия"]
-        }
-    ],
-    "Разговорные": [
-        { 
-            name: "Подкаст-терминал", 
-            url: "http://stream.podcasts-terminal.ru:8000/podcasts-terminal", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["разговорное радио", "подкасты", "интервью"]
-        },
-        { 
-            name: "Радио Свобода", 
-            url: "http://rfe-channel-01.akacast.akamaistream.net/7/371/229652/v1/ibb.akacast.akamaistream.net/rfe_channel_01.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "International",
-            language: "Русский",
-            tags: ["разговорное радио", "новости", "политика"]
-        },
-        { 
-            name: "SWR", 
-            url: "http://str.swr-fm.ru:8000/efir", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["разговорное радио", "новости", "интервью"]
-        }
-    ],
-    "Москва и Московская область": [
-        { 
-            name: "Москва FM", 
-            url: "http://icecast.vgtrk.cdnvideo.ru/moscowfm128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["москва", "региональное", "новости"]
-        },
-        { 
-            name: "Радио Москвы", 
-            url: "http://www.radiomoskvy.ru:8000/mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["москва", "региональное", "новости"]
-        },
-        { 
-            name: "Capital FM", 
-            url: "http://icecast.vgtrk.cdnvideo.ru/capitalfmmp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["москва", "поп", "хиты"]
-        },
-        { 
-            name: "Мегаполис FM", 
-            url: "http://stream04.media.rambler.ru/megapolis128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["москва", "поп", "электроника"]
-        },
-        { 
-            name: "Восток FM", 
-            url: "http://stream5.radiostyle.ru:8005/radioistok", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["москва", "региональное", "поп"]
-        }
-    ],
-    "Санкт-Петербург": [
-        { 
-            name: "Радио Петербург", 
-            url: "http://www.5-tv.ru/radio/radio.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["санкт-петербург", "региональное", "новости"]
-        },
-        { 
-            name: "Питер FM", 
-            url: "http://cdn.radiopiterfm.ru/piterfm", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["санкт-петербург", "поп", "хиты"]
-        },
-        { 
-            name: "Радио Балтика", 
-            url: "http://baltika.hostingradio.ru/baltika128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["санкт-петербург", "поп", "региональное"]
-        },
-        { 
-            name: "Метро FM", 
-            url: "http://stream2.metroradio.ru:8000/metro", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["санкт-петербург", "поп", "хиты"]
-        }
-    ],
-    "Сибирь": [
-        { 
-            name: "Радио Сибирь", 
-            url: "http://radiosibir.ru:8090/HQ", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["сибирь", "региональное", "новости"]
-        },
-        { 
-            name: "Авторадио-Новосибирск", 
-            url: "http://as.ermak-media.ru:4003/avtoradio", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["сибирь", "новосибирск", "поп"]
-        },
-        { 
-            name: "Радио Юнитон", 
-            url: "http://online.uniton.ru:8300/radio-uniton", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["сибирь", "региональное", "поп"]
-        },
-        { 
-            name: "Городская волна", 
-            url: "http://online.gorvolna.ru:8000/gorvolna", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["сибирь", "региональное", "новости"]
-        }
-    ],
-    "Урал": [
-        { 
-            name: "Радио СК", 
-            url: "http://radio.skcmg.ru:8000/sc", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["урал", "региональное", "поп"]
-        },
-        { 
-            name: "Радио Екатеринбург", 
-            url: "http://stream.radioekb.ru:8000/radioekb", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["урал", "екатеринбург", "региональное"]
-        },
-        { 
-            name: "Радио Пилот", 
-            url: "http://online.pilotfm.ru:8000/pilot", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["урал", "поп", "хиты"]
-        },
-        { 
-            name: "Эхо Москвы в Екатеринбурге", 
-            url: "http://echoe.hostingradio.ru:8015/echoekb", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["урал", "екатеринбург", "новости"]
-        }
-    ],
-    "Юг России": [
-        { 
-            name: "Казак FM", 
-            url: "http://radio.riktam.ru:8000/kazak128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["юг россии", "казачья музыка", "народная музыка"]
-        },
-        { 
-            name: "Первое радио Кубани", 
-            url: "http://radio.1gl.ru:8000/128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["юг россии", "кубань", "региональное"]
-        },
-        { 
-            name: "Радио Ростова", 
-            url: "http://live.radiorostov.ru:8000/rostov128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["юг россии", "ростов", "региональное"]
-        },
-        { 
-            name: "Южная волна", 
-            url: "http://stream.volna-fm.ru:8000/live", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["юг россии", "региональное", "поп"]
-        }
+        {name:"Детское радио",url:"https://radio-children.hostingradio.ru/children96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["детское"]}
     ],
     "Развлекательные": [
-        { 
-            name: "Юмор FM", 
-            url: "http://humor128.hostingradio.ru:8016/humor128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["развлекательное", "юмор", "комедия"]
-        },
-        { 
-            name: "Comedy Radio", 
-            url: "http://cdn.radioplayer.ru:8000/comedy128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["развлекательное", "юмор", "комедия"]
-        },
-        { 
-            name: "Радио Шансон", 
-            url: "http://chanson.hostingradio.ru:8041/chanson128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["развлекательное", "шансон", "народная музыка"]
-        },
-        { 
-            name: "Радио Дача", 
-            url: "http://stream.radiodacha.ru/14_dacha_24", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["развлекательное", "поп", "ретро"]
-        },
-        { 
-            name: "Авторадио", 
-            url: "https://pub0302.101.ru:8443/stream/air/aac/64/100", 
-            bitrate: "64 kbps",
-            codec: "AAC",
-            country: "Russia",
-            language: "Русский",
-            tags: ["развлекательное", "поп", "хиты"]
-        }
+        {name:"Юмор FM",url:"https://humor128.hostingradio.ru:8016/humor128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["юмор","комедия"]},
+        {name:"Авторадио",url:"https://pub0302.101.ru:8443/stream/air/aac/64/100",bitrate:"64 kbps",codec:"AAC",tags:["поп","хиты"]}
     ],
     "Образовательные": [
-        { 
-            name: "Радио Культура", 
-            url: "https://icecast-vgtrk.cdnvideo.ru/kulturafm_mp3_192kbps", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["образовательное", "культура", "искусство"]
-        },
-        { 
-            name: "Радио Маяк", 
-            url: "https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_192kbps", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["образовательное", "новости", "разговорное радио"]
-        },
-        { 
-            name: "Говорит Москва", 
-            url: "http://media.govoritmoskva.ru:8000/rufm.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["образовательное", "разговорное радио", "москва"]
-        }
+        {name:"Радио Культура",url:"https://icecast-vgtrk.cdnvideo.ru/kulturafm_mp3_192kbps",bitrate:"192 kbps",codec:"MP3",tags:["культура"]},
+        {name:"Радио Маяк",url:"https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_192kbps",bitrate:"192 kbps",codec:"MP3",tags:["образовательное"]}
     ],
     "Музыкальные": [
-        { 
-            name: "101.ru (Русские Хиты)", 
-            url: "http://ic6.101.ru:8000/stream/pro/aac/64/166", 
-            bitrate: "64 kbps",
-            codec: "AAC",
-            country: "Russia",
-            language: "Русский",
-            tags: ["музыкальное", "поп", "хиты"]
-        },
-        { 
-            name: "Радио Record Online", 
-            url: "http://air.radiorecord.ru:8101/rr_320", 
-            bitrate: "320 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["музыкальное", "электроника", "танцевальная музыка"]
-        },
-        { 
-            name: "Promodj Radio", 
-            url: "http://radio.promodj.com:8000/premium-192", 
-            bitrate: "192 kbps",
-            codec: "MP3",
-            country: "International",
-            language: "Русский",
-            tags: ["музыкальное", "электроника", "диджейская музыка"]
-        },
-        { 
-            name: "Русское Кибер Радио", 
-            url: "http://cyberradio.ru:8000/rq1", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["музыкальное", "электроника", "киберпанк"]
-        },
-        { 
-            name: "Radio Metro", 
-            url: "http://stream.radiometro.ru:8230/metro", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["музыкальное", "поп", "хиты"]
-        }
-    ],
-    "Европа": [
-        { 
-            name: "Русское Радио Европа", 
-            url: "http://s0.radioheart.ru:8000/RH20733", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Europe",
-            language: "Русский",
-            tags: ["европа", "поп", "хиты"]
-        },
-        { 
-            name: "Русский Берлин", 
-            url: "http://rb-stream.de:8000/stream.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Germany",
-            language: "Русский",
-            tags: ["европа", "германия", "поп"]
-        },
-        { 
-            name: "Radio RussianFM (Германия)", 
-            url: "http://stream.laut.fm/russianfm", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Germany",
-            language: "Русский",
-            tags: ["европа", "германия", "поп"]
-        },
-        { 
-            name: "BBC Russian Service", 
-            url: "http://stream.live.vc.bbcmedia.co.uk/bbc_russian_radio", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "UK",
-            language: "Русский",
-            tags: ["европа", "великобритания", "новости"]
-        },
-        { 
-            name: "Русское Радио Балтия", 
-            url: "http://stream.rusradio.lt:8000/rrb128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Lithuania",
-            language: "Русский",
-            tags: ["европа", "балтия", "поп"]
-        },
-        { 
-            name: "Радио Спутник", 
-            url: "https://icecast-rian.cdnvideo.ru/voicerus", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["европа", "новости", "информация"]
-        }
-    ],
-    "Северная Америка": [
-        { 
-            name: "Наше Радио Нью-Йорк", 
-            url: "http://nashe1.hostingradio.ru/nasheny128.mp3", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "USA",
-            language: "Русский",
-            tags: ["северная америка", "сша", "рок"]
-        },
-        { 
-            name: "Русская Реклама", 
-            url: "http://s7.voscast.com:8528/stream", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "USA",
-            language: "Русский",
-            tags: ["северная америка", "сша", "поп"]
-        },
-        { 
-            name: "Русское Радио Чикаго", 
-            url: "http://s4.radioheart.ru:8025/nonstop", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "USA",
-            language: "Русский",
-            tags: ["северная америка", "сша", "поп"]
-        },
-        { 
-            name: "Russian American Radio", 
-            url: "http://icecast.colostreaming.com:8000/rar", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "USA",
-            language: "Русский",
-            tags: ["северная америка", "сша", "поп"]
-        }
-    ],
-    "Азия": [
-        { 
-            name: "Русское Радио Азия", 
-            url: "http://stream.rusradio.asia:8000/rra128", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Asia",
-            language: "Русский",
-            tags: ["азия", "поп", "хиты"]
-        },
-        { 
-            name: "Радио Владивосток FM", 
-            url: "http://vladfm.com:8000/radio", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["азия", "дальний восток", "региональное"]
-        },
-        { 
-            name: "Восток России", 
-            url: "http://stream.radio.vl.ru:8000/vostok-russia", 
-            bitrate: "128 kbps",
-            codec: "MP3",
-            country: "Russia",
-            language: "Русский",
-            tags: ["азия", "дальний восток", "региональное"]
-        }
+        {name:"Record",url:"https://air.radiorecord.ru:8101/rr_320",bitrate:"320 kbps",codec:"MP3",tags:["электроника","танцевальная"]},
+        {name:"Русское Радио",url:"https://rusradio.hostingradio.ru/rusradio96.aacp",bitrate:"96 kbps",codec:"AAC+",tags:["поп","хиты"]},
+        {name:"Наше Радио",url:"https://nashe.hostingradio.ru/nashe-128.mp3",bitrate:"128 kbps",codec:"MP3",tags:["рок"]}
     ]
 };
 
-// =============================================
-// Category icon helper
-// =============================================
-function getCategoryIcon(category) {
-    return categoryEmojis[category] || '🎵';
-}
+// ============================================================
+//  DOM REFS
+// ============================================================
+const $ = id => document.getElementById(id);
+const miniPlayer = $('mini-player');
+const mpName     = $('mp-name');
+const mpStatus   = $('mp-status');
+const mpArt      = $('mp-art');
+const mpInitials = $('mp-initials');
+const mpPlayBtn  = $('mp-play');
+const fpEl       = $('full-player');
+const fpName     = $('fp-name');
+const fpMeta     = $('fp-meta');
+const fpArt      = $('fp-art');
+const fpInitials = $('fp-initials');
+const fpWaves    = $('fp-waves');
+const fpPlayBtn  = $('fp-play');
+const fpFavBtn   = $('fp-fav');
+const fpPrev     = $('fp-prev');
+const fpNext     = $('fp-next');
+const fpMuteBtn  = $('fp-mute');
+const fpVol      = $('fp-vol');
+const gridEl     = $('radio-list');
+const catsEl     = $('categories');
+const catsWrap   = $('cats-wrap');
+const secTitle   = $('section-title');
+const secHdr     = $('section-hdr');
+const searchIn   = $('search-input');
+const searchCl   = $('search-clear');
+const loadingEl  = $('loading');
+const notifEl    = $('notif');
 
-// =============================================
-// Flatten all stations
-// =============================================
-function getAllStations() {
-    const all = [];
-    const seen = new Set();
-    for (const cat of Object.keys(radioStations)) {
-        for (const st of radioStations[cat]) {
-            const key = st.name + '|' + st.url;
-            if (!seen.has(key)) {
-                seen.add(key);
-                all.push({ ...st, category: cat });
-            }
-        }
-    }
-    return all;
-}
-
-// =============================================
-// Favorites
-// =============================================
-function loadFavorites() {
-    try {
-        const raw = localStorage.getItem('radioFavorites');
-        favorites = raw ? JSON.parse(raw) : [];
-    } catch {
-        favorites = [];
-    }
-}
-
-function saveFavorites() {
-    try {
-        localStorage.setItem('radioFavorites', JSON.stringify(favorites));
-    } catch {}
-}
-
-function isFavorite(station) {
-    return favorites.some(f => f.name === station.name && f.url === station.url);
-}
-
-function toggleFavorite(station, event) {
-    if (event) event.stopPropagation();
-    if (isFavorite(station)) {
-        favorites = favorites.filter(f => !(f.name === station.name && f.url === station.url));
-        showNotification('Удалено из избранного', 'info');
-    } else {
-        favorites.push(station);
-        showNotification('Добавлено в избранное', 'success');
-    }
-    saveFavorites();
-    // Refresh cards fav buttons
-    document.querySelectorAll('.fav-btn').forEach(btn => {
-        const name = btn.dataset.name;
-        const url = btn.dataset.url;
-        if (name && url) {
-            const st = { name, url };
-            btn.classList.toggle('active', isFavorite(st));
-            btn.title = isFavorite(st) ? 'Удалить из избранного' : 'Добавить в избранное';
-            btn.textContent = isFavorite(st) ? '♥' : '♡';
-        }
-    });
-    // Rebuild categories to show/hide favorites tab
+// ============================================================
+//  INIT
+// ============================================================
+function init() {
+    applyTgTheme();
+    loadFavorites();
+    setupAudio();
+    setupSearch();
+    setupMiniPlayer();
+    setupFullPlayer();
     setupCategories();
+    filterStations('Все');
+    // online / offline
+    window.addEventListener('online',  () => notify('Соединение восстановлено','success'));
+    window.addEventListener('offline', () => notify('Нет интернет-соединения','error'));
 }
 
-// =============================================
-// Categories
-// =============================================
+// ---- Telegram theme ----
+function applyTgTheme() {
+    if (!tg?.themeParams) return;
+    const tp = tg.themeParams;
+    const r = document.documentElement.style;
+    if (tp.bg_color)            r.setProperty('--bg', tp.bg_color);
+    if (tp.secondary_bg_color)  r.setProperty('--bg2', tp.secondary_bg_color);
+    if (tp.text_color)          r.setProperty('--t1', tp.text_color);
+    if (tp.hint_color)          r.setProperty('--t2', tp.hint_color);
+    if (tp.button_color)        r.setProperty('--accent', tp.button_color);
+}
+
+// ============================================================
+//  CATEGORIES
+// ============================================================
 function setupCategories() {
-    const scroll = document.getElementById('categories-scroll');
-    if (!scroll) return;
-    scroll.innerHTML = '';
-
-    const cats = ['Все'];
-    if (favorites.length > 0) cats.push('❤️ Избранное');
-    cats.push(...Object.keys(radioStations));
-
-    cats.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.className = 'category-btn' + (cat === currentCategory ? ' active' : '');
-        btn.innerHTML = `<span>${getCategoryIcon(cat)}</span><span>${cat}</span>`;
-        btn.addEventListener('click', () => filterStations(cat));
-        scroll.appendChild(btn);
+    catsEl.innerHTML = '';
+    const cats = ['Все', ...Object.keys(radioStations)];
+    // add Favorites if any
+    if (favorites.length) cats.splice(1, 0, '❤️ Избранное');
+    cats.forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'cat-btn' + (c === currentCategory ? ' active' : '');
+        b.textContent = (catEmoji[c] || '') + ' ' + c;
+        b.addEventListener('click', () => filterStations(c));
+        catsEl.appendChild(b);
     });
 }
 
-function filterStations(category) {
-    currentCategory = category;
-    // Clear search
-    const searchInput = document.getElementById('search-input');
-    const searchClear = document.getElementById('search-clear');
-    if (searchInput) searchInput.value = '';
-    if (searchClear) searchClear.classList.add('hidden');
-    document.getElementById('categories-wrap').classList.remove('hidden');
-
-    // Update active category button
-    document.querySelectorAll('.category-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.querySelector('span:last-child')?.textContent === category);
+function filterStations(cat) {
+    currentCategory = cat;
+    // update active button
+    catsEl.querySelectorAll('.cat-btn').forEach(b => {
+        b.classList.toggle('active', b.textContent.includes(cat));
     });
-
     let stations;
-    if (category === 'Все') {
-        stations = getAllStations();
-    } else if (category === '❤️ Избранное') {
-        stations = favorites;
+    if (cat === 'Все') {
+        stations = dedupe(Object.values(radioStations).flat());
+    } else if (cat === '❤️ Избранное') {
+        stations = favorites.slice();
     } else {
-        stations = (radioStations[category] || []).map(s => ({ ...s, category }));
+        stations = radioStations[cat] || [];
     }
-
+    secTitle.textContent = cat === 'Все' ? 'Все станции' : cat;
+    stationList = stations;
+    updateStationIdx();
     displayStations(stations);
 }
 
-// =============================================
-// Search
-// =============================================
-function searchStations(query) {
-    const categoriesWrap = document.getElementById('categories-wrap');
-    const searchClear = document.getElementById('search-clear');
-
-    if (!query.trim()) {
-        searchClear.classList.add('hidden');
-        categoriesWrap.classList.remove('hidden');
-        filterStations(currentCategory);
-        return;
-    }
-
-    searchClear.classList.remove('hidden');
-    categoriesWrap.classList.add('hidden');
-
-    const q = query.toLowerCase();
-    const results = getAllStations().filter(s => {
-        return s.name.toLowerCase().includes(q) ||
-            (s.tags && s.tags.some(tag => tag.toLowerCase().includes(q)));
-    });
-
-    displayStations(results, `Поиск: «${query}»`);
-}
-
-// =============================================
-// Display Stations
-// =============================================
-function displayStations(stations, title) {
-    const list = document.getElementById('radio-list');
-    if (!list) return;
-    list.innerHTML = '';
-
-    if (!stations || stations.length === 0) {
-        list.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">📻</div>
-                <div class="empty-state-text">Станции не найдены</div>
-                <div class="empty-state-sub">Попробуйте другой запрос или категорию</div>
-            </div>`;
-        return;
-    }
-
-    stations.forEach(station => {
-        const card = createStationCard(station);
-        list.appendChild(card);
+function dedupe(arr) {
+    const seen = new Set();
+    return arr.filter(s => {
+        if (seen.has(s.url)) return false;
+        seen.add(s.url);
+        return true;
     });
 }
 
-// =============================================
-// Create Station Card
-// =============================================
-function createStationCard(station) {
+// ============================================================
+//  DISPLAY STATIONS
+// ============================================================
+function displayStations(stations) {
+    gridEl.innerHTML = '';
+    if (!stations.length) {
+        gridEl.innerHTML = '<div class="no-results">Ничего не найдено</div>';
+        return;
+    }
+    const frag = document.createDocumentFragment();
+    stations.forEach((s, i) => frag.appendChild(createCard(s, i)));
+    gridEl.appendChild(frag);
+}
+
+function createCard(station, idx) {
     const card = document.createElement('div');
-    const isActive = currentStation && currentStation.name === station.name && currentStation.url === station.url;
-    const isFav = isFavorite(station);
-    const icon = getCategoryIcon(station.category || currentCategory);
+    card.className = 'st-card';
+    if (currentStation && currentStation.url === station.url && isPlaying) card.classList.add('playing');
+    card.dataset.url = station.url;
 
-    card.className = 'radio-card' + (isActive ? ' active' : '');
+    const isFav = favorites.some(f => f.url === station.url);
+
     card.innerHTML = `
-        <div class="card-icon">${icon}</div>
-        <div class="card-body">
-            <div class="card-name" title="${station.name}">${station.name}</div>
-            <div class="card-meta">
-                <span class="card-bitrate">${station.bitrate || ''}</span>
-                <span class="card-codec">${station.codec || ''}</span>
-                <div class="card-playing-badge">
-                    <div class="card-playing-waves">
-                        <div class="bar"></div>
-                        <div class="bar"></div>
-                        <div class="bar"></div>
-                    </div>
-                    В ЭФИРЕ
-                </div>
-            </div>
-        </div>
-        <div class="card-actions">
-            <button class="fav-btn ${isFav ? 'active' : ''}" 
-                    data-name="${station.name}" 
-                    data-url="${station.url}" 
-                    title="${isFav ? 'Удалить из избранного' : 'Добавить в избранное'}">
+        <div class="card-art" style="background:${grad(station.name)}">
+            <span class="card-init">${initials(station.name)}</span>
+            <button class="card-fav${isFav ? ' active' : ''}" data-idx="${idx}">
                 ${isFav ? '♥' : '♡'}
             </button>
+            <button class="card-play-btn" data-idx="${idx}">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div class="card-overlay">
+                <div class="card-eq"><span></span><span></span><span></span></div>
+            </div>
+        </div>
+        <div class="card-info">
+            <div class="card-name">${station.name}</div>
+            <div class="card-meta">${station.bitrate} · ${station.codec}</div>
         </div>`;
 
-    card.addEventListener('click', (e) => {
-        if (e.target.closest('.fav-btn')) return;
-        if (isActive && isPlaying) {
-            stopPlayback();
-        } else {
-            playStation(station);
-        }
+    // play
+    card.querySelector('.card-play-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        stationIdx = idx;
+        playStation(station);
     });
-
-    card.querySelector('.fav-btn').addEventListener('click', (e) => {
-        toggleFavorite(station, e);
+    card.addEventListener('click', () => {
+        stationIdx = idx;
+        playStation(station);
     });
-
+    // fav
+    card.querySelector('.card-fav').addEventListener('click', e => {
+        e.stopPropagation();
+        toggleFav(station);
+    });
     return card;
 }
 
-// =============================================
-// Player UI Update
-// =============================================
-function updatePlayerUI(station) {
-    const nameEl = document.getElementById('player-station-name');
-    const iconEl = document.getElementById('station-icon');
-    const onAirTag = document.getElementById('on-air-tag');
-    const soundWaves = document.getElementById('sound-waves');
-    const iconPlay = document.getElementById('icon-play');
-    const iconPause = document.getElementById('icon-pause');
-
-    if (station) {
-        nameEl.textContent = station.name;
-        iconEl.textContent = getCategoryIcon(station.category || currentCategory);
-    }
-
-    if (isPlaying) {
-        iconPlay.classList.add('hidden');
-        iconPause.classList.remove('hidden');
-        onAirTag.classList.add('visible');
-        soundWaves.classList.add('visible');
-        iconEl.classList.add('playing');
-    } else {
-        iconPlay.classList.remove('hidden');
-        iconPause.classList.add('hidden');
-        onAirTag.classList.remove('visible');
-        soundWaves.classList.remove('visible');
-        iconEl.classList.remove('playing');
-    }
-}
-
-function updatePlayingCards() {
-    document.querySelectorAll('.radio-card').forEach(card => {
-        const nameEl = card.querySelector('.card-name');
-        if (!nameEl) return;
-        const isActive = currentStation && nameEl.textContent === currentStation.name;
-        card.classList.toggle('active', isActive);
-    });
-}
-
-// =============================================
-// Playback
-// =============================================
-function playStation(station) {
-    if (!navigator.onLine) {
-        showNotification('Нет интернет-соединения', 'error');
-        return;
-    }
-
-    retryCount = 0;
-    attemptPlay(station);
-}
-
-function attemptPlay(station) {
-    clearTimeout(retryTimer);
-    clearTimeout(loadTimeout);
-
-    currentStation = station;
-    showLoadingOverlay(true);
-    showNotification('Загрузка...', 'info');
-
-    audio.pause();
-    audio.src = station.url;
-    audio.load();
-
-    loadTimeout = setTimeout(() => {
-        if (!isPlaying) {
-            showLoadingOverlay(false);
-            if (retryCount < MAX_RETRIES) {
-                retryCount++;
-                showNotification(`Ошибка загрузки станции. Попытка повтора... (${retryCount}/${MAX_RETRIES})`, 'warning');
-                retryTimer = setTimeout(() => attemptPlay(station), 2000);
-            } else {
-                showNotification('Таймаут загрузки. Проверьте подключение', 'error');
-                currentStation = null;
-                isPlaying = false;
-                updatePlayerUI(null);
-                updatePlayingCards();
-            }
-        }
-    }, 15000);
-
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(err => {
-            // Handled by onerror event
-        });
-    }
-}
-
-function stopPlayback() {
-    clearTimeout(retryTimer);
-    clearTimeout(loadTimeout);
-    audio.pause();
-    isPlaying = false;
-    showLoadingOverlay(false);
-    showNotification('Остановлено', 'info');
-    updatePlayerUI(currentStation);
-    updatePlayingCards();
-}
-
-function startPlayback() {
-    if (!currentStation) {
-        showNotification('Выберите станцию', 'info');
-        return;
-    }
-    playStation(currentStation);
-}
-
-// =============================================
-// Audio Events (set up ONCE)
-// =============================================
-function setupAudioEvents() {
-    audio.volume = volume;
-
-    audio.addEventListener('playing', () => {
-        clearTimeout(loadTimeout);
-        isPlaying = true;
-        retryCount = 0;
-        showLoadingOverlay(false);
-        showNotification(`Воспроизведение: ${currentStation?.name || ''}`, 'success');
-        updatePlayerUI(currentStation);
-        updatePlayingCards();
-    });
-
-    audio.addEventListener('pause', () => {
-        isPlaying = false;
-        updatePlayerUI(currentStation);
-        updatePlayingCards();
-    });
-
-    audio.addEventListener('ended', () => {
-        isPlaying = false;
-        showLoadingOverlay(false);
-        updatePlayerUI(currentStation);
-        updatePlayingCards();
-    });
-
-    audio.addEventListener('waiting', () => {
-        showLoadingOverlay(true);
-    });
-
-    audio.addEventListener('canplay', () => {
-        showLoadingOverlay(false);
-    });
-
-    audio.addEventListener('error', () => {
-        clearTimeout(loadTimeout);
-        showLoadingOverlay(false);
-        isPlaying = false;
-
-        const err = audio.error;
-        if (err) {
-            const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
-            if (err.code === MEDIA_ERR_SRC_NOT_SUPPORTED && currentStation) {
-                const codec = currentStation.codec || 'неизвестный';
-                showNotification(`Формат ${codec} не поддерживается браузером`, 'error');
+// ============================================================
+//  SEARCH
+// ============================================================
+function setupSearch() {
+    searchIn.addEventListener('input', () => {
+        const q = searchIn.value.trim();
+        searchCl.classList.toggle('hidden', !q);
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            if (!q) {
+                catsWrap.classList.remove('hidden');
+                secHdr.classList.remove('hidden');
+                filterStations(currentCategory);
                 return;
             }
-        }
-
-        if (retryCount < MAX_RETRIES && currentStation) {
-            retryCount++;
-            showNotification(`Ошибка загрузки станции. Попытка повтора... (${retryCount}/${MAX_RETRIES})`, 'warning');
-            retryTimer = setTimeout(() => attemptPlay(currentStation), 2000);
-        } else {
-            showNotification('Станция не доступна', 'error');
-            updatePlayerUI(currentStation);
-            updatePlayingCards();
-        }
-    });
-
-    audio.addEventListener('stalled', () => {
-        showLoadingOverlay(true);
-    });
-}
-
-// =============================================
-// Loading Overlay
-// =============================================
-function showLoadingOverlay(show) {
-    const overlay = document.getElementById('loading-overlay');
-    if (!overlay) return;
-    overlay.classList.toggle('hidden', !show);
-}
-
-// =============================================
-// Notification
-// =============================================
-let notificationTimer = null;
-function showNotification(message, type = '') {
-    const el = document.getElementById('notification');
-    if (!el) return;
-    clearTimeout(notificationTimer);
-    el.textContent = message;
-    el.className = `notification ${type}`;
-    // Force reflow for animation restart
-    void el.offsetWidth;
-    el.classList.add('show');
-    notificationTimer = setTimeout(() => {
-        el.classList.remove('show');
-    }, 3000);
-}
-
-// =============================================
-// Telegram Theme
-// =============================================
-function applyTelegramTheme() {
-    if (!tg || !tg.themeParams) return;
-    const p = tg.themeParams;
-    const root = document.documentElement;
-    const set = (v, k) => v && root.style.setProperty(k, v);
-
-    set(p.bg_color, '--tg-theme-bg-color');
-    set(p.text_color, '--tg-theme-text-color');
-    set(p.hint_color, '--tg-theme-hint-color');
-    set(p.button_color, '--tg-theme-button-color');
-    set(p.button_text_color, '--tg-theme-button-text-color');
-    set(p.secondary_bg_color, '--tg-theme-secondary-bg-color');
-    if (p.button_color) {
-        root.style.setProperty('--accent', p.button_color);
-    }
-    if (p.secondary_bg_color) {
-        root.style.setProperty('--card-bg', p.secondary_bg_color);
-    }
-}
-
-// =============================================
-// Init
-// =============================================
-function init() {
-    if (tg) applyTelegramTheme();
-
-    loadFavorites();
-    setupCategories();
-    setupAudioEvents();
-
-    // Initial display — all stations
-    filterStations('Все');
-
-    // Play/Pause button
-    document.getElementById('btn-play-pause').addEventListener('click', () => {
-        if (isPlaying) {
-            stopPlayback();
-        } else {
-            startPlayback();
-        }
-    });
-
-    // Mute button
-    const btnMute = document.getElementById('btn-mute');
-    const iconVol = document.getElementById('icon-vol');
-    const iconMute = document.getElementById('icon-mute');
-    btnMute.addEventListener('click', () => {
-        isMuted = !isMuted;
-        audio.muted = isMuted;
-        btnMute.classList.toggle('muted', isMuted);
-        iconVol.classList.toggle('hidden', isMuted);
-        iconMute.classList.toggle('hidden', !isMuted);
-    });
-
-    // Volume slider
-    const volSlider = document.getElementById('volume-slider');
-    volSlider.value = Math.round(volume * 100);
-    volSlider.addEventListener('input', () => {
-        volume = volSlider.value / 100;
-        audio.volume = volume;
-        if (volume === 0) {
-            isMuted = true;
-            audio.muted = true;
-            btnMute.classList.add('muted');
-            iconVol.classList.add('hidden');
-            iconMute.classList.remove('hidden');
-        } else if (isMuted) {
-            isMuted = false;
-            audio.muted = false;
-            btnMute.classList.remove('muted');
-            iconVol.classList.remove('hidden');
-            iconMute.classList.add('hidden');
-        }
-    });
-
-    // Search input
-    const searchInput = document.getElementById('search-input');
-    searchInput.addEventListener('input', () => {
-        clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => {
-            searchStations(searchInput.value);
+            catsWrap.classList.add('hidden');
+            secHdr.classList.add('hidden');
+            const low = q.toLowerCase();
+            const all = dedupe(Object.values(radioStations).flat());
+            const res = all.filter(s =>
+                s.name.toLowerCase().includes(low) ||
+                (s.tags && s.tags.some(t => t.toLowerCase().includes(low)))
+            );
+            stationList = res;
+            updateStationIdx();
+            displayStations(res);
         }, 300);
     });
-
-    // Search clear
-    document.getElementById('search-clear').addEventListener('click', () => {
-        searchInput.value = '';
-        searchInput.dispatchEvent(new Event('input'));
-        searchInput.focus();
+    searchCl.addEventListener('click', () => {
+        searchIn.value = '';
+        searchCl.classList.add('hidden');
+        catsWrap.classList.remove('hidden');
+        secHdr.classList.remove('hidden');
+        filterStations(currentCategory);
     });
-
-    // Offline/online events
-    window.addEventListener('offline', () => {
-        showNotification('Нет интернет-соединения', 'error');
-        if (isPlaying) stopPlayback();
-    });
-    window.addEventListener('online', () => {
-        showNotification('Подключение восстановлено', 'success');
-    });
-
-    // Update player bar initial state
-    updatePlayerUI(null);
 }
 
+// ============================================================
+//  PLAY / STOP / TOGGLE
+// ============================================================
+function playStation(station) {
+    if (!station || !station.url) return;
+    if (!navigator.onLine) { notify('Нет интернет-соединения','error'); return; }
+
+    // same station playing → toggle
+    if (currentStation && currentStation.url === station.url) {
+        togglePlay();
+        return;
+    }
+
+    // stop current
+    stopAudio();
+    retryCount = 0;
+    currentStation = station;
+    updateStationIdx();
+
+    // show mini player & UI
+    miniPlayer.classList.remove('hidden');
+    updateUI();
+
+    // start
+    attemptPlay();
+}
+
+function attemptPlay() {
+    if (!currentStation) return;
+    showLoading();
+
+    audio.src = currentStation.url;
+    audio.volume = volume;
+    audio.muted = isMuted;
+    audio.load();
+
+    clearTimeout(loadTimer);
+    loadTimer = setTimeout(() => {
+        if (!isPlaying) {
+            hideLoading();
+            if (retryCount < 3) {
+                retryCount++;
+                notify(`Повтор загрузки (${retryCount}/3)...`, 'info');
+                attemptPlay();
+            } else {
+                notify('Станция недоступна', 'error');
+                stopAudio();
+            }
+        }
+    }, 12000);
+
+    audio.play().then(() => {
+        clearTimeout(loadTimer);
+        hideLoading();
+        isPlaying = true;
+        retryCount = 0;
+        updateUI();
+        notify('▶ ' + currentStation.name, 'success');
+    }).catch(err => {
+        clearTimeout(loadTimer);
+        hideLoading();
+        if (retryCount < 3) {
+            retryCount++;
+            notify(`Повтор загрузки (${retryCount}/3)...`, 'info');
+            setTimeout(attemptPlay, 2000);
+        } else {
+            notify('Ошибка воспроизведения', 'error');
+            stopAudio();
+        }
+    });
+}
+
+function stopAudio() {
+    clearTimeout(loadTimer);
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load();
+    isPlaying = false;
+    hideLoading();
+}
+
+function togglePlay() {
+    if (!currentStation) { notify('Выберите станцию', 'info'); return; }
+    if (isPlaying) {
+        stopAudio();
+        updateUI();
+        notify('Остановлено', 'info');
+    } else {
+        retryCount = 0;
+        attemptPlay();
+    }
+}
+
+function prevStation() {
+    if (!stationList.length) return;
+    stationIdx = (stationIdx - 1 + stationList.length) % stationList.length;
+    playStation(stationList[stationIdx]);
+}
+function nextStation() {
+    if (!stationList.length) return;
+    stationIdx = (stationIdx + 1) % stationList.length;
+    playStation(stationList[stationIdx]);
+}
+
+function updateStationIdx() {
+    if (!currentStation) { stationIdx = -1; return; }
+    const i = stationList.findIndex(s => s.url === currentStation.url);
+    if (i !== -1) stationIdx = i;
+}
+
+// ============================================================
+//  AUDIO EVENTS (once)
+// ============================================================
+function setupAudio() {
+    audio.addEventListener('playing', () => {
+        isPlaying = true;
+        hideLoading();
+        updateUI();
+    });
+    audio.addEventListener('pause', () => {
+        isPlaying = false;
+        updateUI();
+    });
+    audio.addEventListener('waiting', showLoading);
+    audio.addEventListener('canplay', hideLoading);
+    audio.addEventListener('stalled', showLoading);
+    audio.addEventListener('error', e => {
+        hideLoading();
+        isPlaying = false;
+        updateUI();
+    });
+}
+
+// ============================================================
+//  UI UPDATE
+// ============================================================
+function updateUI() {
+    const s = currentStation;
+    const g = s ? grad(s.name) : 'linear-gradient(135deg,#333,#222)';
+    const ini = s ? initials(s.name) : '📻';
+    const name = s ? s.name : 'Выберите станцию';
+
+    // mini player
+    mpName.textContent = name;
+    mpStatus.textContent = isPlaying ? 'В эфире' : (s ? 'Пауза' : '');
+    mpArt.style.background = g;
+    mpInitials.textContent = ini;
+    miniPlayer.classList.toggle('playing', isPlaying);
+    togglePlayIcon(mpPlayBtn, isPlaying);
+
+    // full player
+    fpName.textContent = name;
+    fpMeta.textContent = s ? `${s.bitrate} · ${s.codec}` : '—';
+    fpArt.style.background = g;
+    fpInitials.textContent = ini;
+    fpWaves.classList.toggle('paused', !isPlaying);
+    togglePlayIcon(fpPlayBtn, isPlaying);
+
+    // fav button in full player
+    if (s) {
+        const isFav = favorites.some(f => f.url === s.url);
+        fpFavBtn.classList.toggle('active', isFav);
+        fpFavBtn.querySelector('svg path').setAttribute('d',
+            isFav
+            ? 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
+            : 'M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z'
+        );
+    }
+
+    // cards
+    gridEl.querySelectorAll('.st-card').forEach(c => {
+        c.classList.toggle('playing', s && c.dataset.url === s.url && isPlaying);
+    });
+}
+
+function togglePlayIcon(btn, playing) {
+    const pl = btn.querySelector('.icon-play');
+    const pa = btn.querySelector('.icon-pause');
+    if (pl) pl.classList.toggle('hidden', playing);
+    if (pa) pa.classList.toggle('hidden', !playing);
+}
+
+// ============================================================
+//  MINI PLAYER
+// ============================================================
+function setupMiniPlayer() {
+    $('mp-open').addEventListener('click', openFullPlayer);
+    mpPlayBtn.addEventListener('click', e => { e.stopPropagation(); togglePlay(); });
+}
+
+// ============================================================
+//  FULL PLAYER
+// ============================================================
+function openFullPlayer() {
+    fpEl.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeFullPlayer() {
+    fpEl.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function setupFullPlayer() {
+    $('fp-close').addEventListener('click', closeFullPlayer);
+    fpPlayBtn.addEventListener('click', togglePlay);
+    fpPrev.addEventListener('click', prevStation);
+    fpNext.addEventListener('click', nextStation);
+    fpFavBtn.addEventListener('click', () => { if (currentStation) toggleFav(currentStation); });
+    fpMuteBtn.addEventListener('click', toggleMute);
+    fpVol.addEventListener('input', e => {
+        volume = e.target.value / 100;
+        audio.volume = volume;
+        if (volume > 0) { isMuted = false; audio.muted = false; }
+        updateMuteIcon();
+    });
+    // swipe down to close
+    let startY = 0;
+    fpEl.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, {passive:true});
+    fpEl.addEventListener('touchend', e => {
+        const dy = e.changedTouches[0].clientY - startY;
+        if (dy > 100) closeFullPlayer();
+    }, {passive:true});
+}
+
+function toggleMute() {
+    isMuted = !isMuted;
+    audio.muted = isMuted;
+    updateMuteIcon();
+}
+
+function updateMuteIcon() {
+    const vol = fpMuteBtn.querySelector('.icon-vol');
+    const mut = fpMuteBtn.querySelector('.icon-mute');
+    vol.classList.toggle('hidden', isMuted);
+    mut.classList.toggle('hidden', !isMuted);
+}
+
+// ============================================================
+//  FAVORITES
+// ============================================================
+function loadFavorites() {
+    try { favorites = JSON.parse(localStorage.getItem('radioFavorites') || '[]'); } catch { favorites = []; }
+}
+function saveFavorites() {
+    localStorage.setItem('radioFavorites', JSON.stringify(favorites));
+}
+function toggleFav(station) {
+    const idx = favorites.findIndex(f => f.url === station.url);
+    if (idx !== -1) {
+        favorites.splice(idx, 1);
+        notify('Удалено из избранного', 'info');
+    } else {
+        favorites.push(station);
+        notify('Добавлено в избранное ❤️', 'success');
+    }
+    saveFavorites();
+    setupCategories();
+    if (currentCategory === '❤️ Избранное') filterStations('❤️ Избранное');
+    updateUI();
+    // update cards fav buttons
+    gridEl.querySelectorAll('.card-fav').forEach(btn => {
+        const i = parseInt(btn.dataset.idx);
+        if (i >= 0 && i < stationList.length) {
+            const isFav = favorites.some(f => f.url === stationList[i].url);
+            btn.classList.toggle('active', isFav);
+            btn.textContent = isFav ? '♥' : '♡';
+        }
+    });
+}
+
+// ============================================================
+//  UTILS
+// ============================================================
+function showLoading() { loadingEl.classList.remove('hidden'); }
+function hideLoading() { loadingEl.classList.add('hidden'); }
+
+let notifTimer = null;
+function notify(msg, type = 'info') {
+    clearTimeout(notifTimer);
+    notifEl.textContent = msg;
+    notifEl.className = 'notif ' + type + ' show';
+    notifTimer = setTimeout(() => notifEl.classList.remove('show'), 2500);
+}
+
+// ---- Start ----
 document.addEventListener('DOMContentLoaded', init);

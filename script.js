@@ -18,10 +18,7 @@ let apiBase = API_SERVERS[0];
 async function apiFetch(path, signal) {
     for (const srv of API_SERVERS) {
         try {
-            const res = await fetch(srv + path, {
-                signal,
-                headers: { 'User-Agent': 'RadioTotBot/2.0 (tg mini app)' }
-            });
+            const res = await fetch(srv + path, { signal });
             if (res.ok) { apiBase = srv; return res.json(); }
         } catch (e) {
             if (e.name === 'AbortError') throw e;
@@ -99,6 +96,14 @@ const flag = code => {
 };
 const regionNames = (() => { try { return new Intl.DisplayNames(['ru'],{type:'region'}); } catch { return null; } })();
 const countryName = code => { try { return regionNames?.of(code) || code; } catch { return code; } };
+// Страница открывается по HTTPS, поэтому http-потоки и логотипы блокируются как mixed content
+const toHttps = u => (u && u.indexOf('http://') === 0) ? 'https://' + u.slice(7) : (u || '');
+// Разрешаем для ссылок только http/https
+const safeHref = u => /^https?:\/\//i.test(u || '') ? u : '';
+
+// ---- Иконки избранного (без дублирования путей) ----
+const ICON_HEART_FILLED  = 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z';
+const ICON_HEART_OUTLINE = 'M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z';
 
 // ---- DOM ----
 const $ = id => document.getElementById(id);
@@ -123,6 +128,7 @@ const fpPlayBtn   = $('fp-play');
 const fpPrev      = $('fp-prev');
 const fpNext      = $('fp-next');
 const fpVol       = $('fp-vol');
+const fpMute      = $('fp-mute');
 const fpHome      = $('fp-home');
 const listEl      = $('stations-list');
 const genreSel    = $('genre-sel');
@@ -142,6 +148,7 @@ const loadMoreBtn  = $('load-more-btn');
 async function init() {
     applyTgTheme();
     loadFavorites();
+    loadSettings();
     setupAudio();
     setupSearch();
     setupMiniPlayer();
@@ -154,7 +161,8 @@ async function init() {
     window.addEventListener('offline', () => notify('Нет интернет-соединения','error'));
     // Load countries async (don't block)
     loadCountries();
-    // Load stations
+    // Restore last played station (paused) and load stations
+    restoreLastStation();
     fetchStations(true);
 }
 
@@ -163,11 +171,17 @@ function applyTgTheme() {
     if (!tg?.themeParams) return;
     const tp = tg.themeParams;
     const r = document.documentElement.style;
+    const light = tg.colorScheme === 'light';
     if (tp.bg_color)           r.setProperty('--bg', tp.bg_color);
     if (tp.secondary_bg_color) r.setProperty('--bg2', tp.secondary_bg_color);
     if (tp.text_color)         r.setProperty('--t1', tp.text_color);
     if (tp.hint_color)         r.setProperty('--t2', tp.hint_color);
     if (tp.button_color)       r.setProperty('--accent', tp.button_color);
+    // Полупрозрачные подложки читаются и в светлой, и в тёмной теме
+    r.setProperty('--bg3', light ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.07)');
+    r.setProperty('--bg4', light ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.15)');
+    r.setProperty('--t3',  light ? 'rgba(0,0,0,.45)' : '#535353');
+    document.documentElement.classList.toggle('theme-light', light);
 }
 
 // ============================================================
@@ -240,7 +254,12 @@ function showFavorites() {
     stationList = [...favorites];
     secTitle.textContent = '❤️ Избранное';
     countBadge.textContent = favorites.length ? `${favorites.length}` : '0';
+    $('station-count').textContent = favorites.length ? favorites.length + ' станций' : '';
     loadMoreWrap.style.display = 'none';
+    if (!favorites.length) {
+        listEl.innerHTML = '<div class="no-results">Пока нет избранных станций.<br>Нажмите ❤️ у любой станции, чтобы добавить её сюда.</div>';
+        return;
+    }
     renderList(favorites, true);
     updateStationIdx();
 }
@@ -255,14 +274,16 @@ function setupSearch() {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => {
             searchQuery = q;
-            fetchStations(true);
+            if (currentTab === 'fav') switchTab('all');   // поиск не работает во вкладке «Избранное»
+            else fetchStations(true);
         }, 400);
     });
     searchCl.addEventListener('click', () => {
         searchIn.value = '';
         searchCl.classList.add('hidden');
         searchQuery = '';
-        fetchStations(true);
+        if (currentTab === 'fav') showFavorites();
+        else fetchStations(true);
     });
 }
 
@@ -306,8 +327,11 @@ async function fetchStations(reset = false) {
             stationList = data;
             renderList(data, true);
         } else {
-            stationList = [...stationList, ...data];
-            renderList(data, false);
+            // offset + меняющаяся сортировка даёт повторы — пропускаем уже загруженные станции
+            const seen = new Set(stationList.map(s => s.stationuuid));
+            const fresh = data.filter(s => !seen.has(s.stationuuid));
+            stationList = [...stationList, ...fresh];
+            renderList(fresh, false);
         }
 
         // Update section title
@@ -369,20 +393,24 @@ function createItem(station, idx) {
     item.dataset.uuid = station.stationuuid;
 
     const isFav = favorites.some(f => f.stationuuid === station.stationuuid);
-    const favPath = isFav
-        ? 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
-        : 'M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z';
+    const favPath = isFav ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
 
     const g = grad(station.name);
     const ini = initials(station.name);
     const countryCode = station.countrycode || '';
+    const favicon = toHttps(station.favicon);
+    const countryLabel = countryName(countryCode) || station.country || '';
     const tags = (station.tags || '').split(',').slice(0,2).join(', ');
-    const metaParts = [flag(countryCode) + ' ' + (countryName(countryCode) || station.country || ''), tags, station.bitrate ? station.bitrate + ' kbps' : ''].filter(Boolean);
+    const metaParts = [
+        (flag(countryCode) + ' ' + escHtml(countryLabel)).trim(),
+        escHtml(tags),
+        station.bitrate ? station.bitrate + ' kbps' : ''
+    ].filter(Boolean);
 
     item.innerHTML = `
         <div class="si-logo-wrap" style="background:${g}">
-            <img class="si-logo ${station.favicon ? '' : 'hidden'}" data-src="${station.favicon || ''}" alt="">
-            <span class="si-init ${station.favicon ? 'hidden' : ''}">${ini}</span>
+            <img class="si-logo ${favicon ? '' : 'hidden'}" data-src="${escHtml(favicon)}" alt="">
+            <span class="si-init ${favicon ? 'hidden' : ''}">${escHtml(ini)}</span>
             <div class="si-eq"><span></span><span></span><span></span></div>
         </div>
         <div class="si-info">
@@ -401,10 +429,10 @@ function createItem(station, idx) {
     // Lazy-load logo
     const img = item.querySelector('.si-logo');
     const initEl = item.querySelector('.si-init');
-    if (station.favicon && img) {
+    if (favicon && img) {
         img.addEventListener('error', () => { img.classList.add('hidden'); initEl.classList.remove('hidden'); });
         img.addEventListener('load',  () => { img.classList.remove('hidden'); initEl.classList.add('hidden'); });
-        img.src = station.favicon;
+        img.src = favicon;
     }
 
     // Play
@@ -418,7 +446,7 @@ function createItem(station, idx) {
 }
 
 function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ============================================================
@@ -438,15 +466,16 @@ function playStation(station) {
     miniPlayer.classList.remove('hidden');
     updateUI();
     attemptPlay();
+    haptic('light');
+    saveLastStation(station);
 
     // Register click with Radio Browser (for stats)
     try { fetch(apiBase + '/url/' + station.stationuuid); } catch {}
 }
 
 function getStreamUrl(station) {
-    // Prefer url_resolved (usually HTTPS), fall back to url
-    const u = station.url_resolved || station.url || '';
-    return u;
+    // Предпочитаем url_resolved (обычно HTTPS), при необходимости апгрейдим схему
+    return toHttps(station.url_resolved || station.url || '');
 }
 
 function attemptPlay() {
@@ -544,6 +573,35 @@ function setupAudio() {
     audio.addEventListener('canplay', hideLoading);
     audio.addEventListener('stalled', showLoading);
     audio.addEventListener('error',   () => { hideLoading(); isPlaying = false; updateUI(); });
+    setupMediaSession();
+}
+
+// ---- Media Session (управление с локскрина и наушников) ----
+function setupMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    const safe = fn => () => { try { fn(); } catch {} };
+    try {
+        ms.setActionHandler('play',          safe(() => { if (!isPlaying) togglePlay(); }));
+        ms.setActionHandler('pause',         safe(() => { if (isPlaying) togglePlay(); }));
+        ms.setActionHandler('nexttrack',     safe(nextStation));
+        ms.setActionHandler('previoustrack', safe(prevStation));
+        ms.setActionHandler('stop',          safe(() => { stopAudio(); updateUI(); }));
+    } catch {}
+}
+
+function updateMediaSession() {
+    if (!('mediaSession' in navigator) || !currentStation) return;
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    try {
+        const artwork = toHttps(currentStation.favicon);
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title:  currentStation.name,
+            artist: [countryName(currentStation.countrycode), (currentStation.tags || '').split(',').slice(0, 2).join(', ')].filter(Boolean).join(' · ') || 'Радио',
+            album:  'RadioTotBot',
+            artwork: artwork ? [{ src: artwork, sizes: '512x512', type: 'image/png' }] : []
+        });
+    } catch {}
 }
 
 // ============================================================
@@ -553,6 +611,7 @@ function updateUI() {
     const s = currentStation;
     const g = s ? grad(s.name) : '#1e1e1e';
     const ini = s ? initials(s.name) : '♪';
+    const favUrl = toHttps(s?.favicon);
 
     // --- mini player ---
     mpName.textContent    = s ? s.name : 'Выберите станцию';
@@ -561,8 +620,8 @@ function updateUI() {
     mpInitials.textContent = ini;
     miniPlayer.classList.toggle('playing', isPlaying);
     // mini logo
-    if (s?.favicon) {
-        mpLogo.src = s.favicon;
+    if (favUrl) {
+        mpLogo.src = favUrl;
         mpLogo.classList.remove('hidden');
         mpInitials.style.display = 'none';
         mpLogo.onerror = () => { mpLogo.classList.add('hidden'); mpInitials.style.display = ''; };
@@ -583,8 +642,8 @@ function updateUI() {
     fpInitials.textContent  = ini;
     fpWaves.classList.toggle('paused', !isPlaying);
     // fp logo
-    if (s?.favicon) {
-        fpLogo.src = s.favicon;
+    if (favUrl) {
+        fpLogo.src = favUrl;
         fpLogo.classList.remove('hidden');
         fpInitials.classList.add('hidden');
         fpLogo.onerror = () => { fpLogo.classList.add('hidden'); fpInitials.classList.remove('hidden'); };
@@ -597,17 +656,21 @@ function updateUI() {
     // fav
     const isFav = s ? favorites.some(f => f.stationuuid === s.stationuuid) : false;
     fpFavBtn.classList.toggle('active', isFav);
-    fpFavPath.setAttribute('d', isFav
-        ? 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
-        : 'M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z');
+    fpFavPath.setAttribute('d', isFav ? ICON_HEART_FILLED : ICON_HEART_OUTLINE);
+    // mute
+    fpMute.classList.toggle('muted', isMuted);
+    fpMute.setAttribute('aria-label', isMuted ? 'Включить звук' : 'Выключить звук');
     // homepage
-    if (s?.homepage) { fpHome.href = s.homepage; fpHome.style.display = ''; }
+    const home = safeHref(s?.homepage);
+    if (home) { fpHome.href = home; fpHome.style.display = ''; }
     else fpHome.style.display = 'none';
 
     // Cards in list: highlight playing
     listEl.querySelectorAll('.st-item').forEach(el => {
         el.classList.toggle('playing', s && el.dataset.uuid === s.stationuuid && isPlaying);
     });
+
+    updateMediaSession();
 }
 
 function toggleIcons(btn, playing) {
@@ -626,8 +689,16 @@ function setupMiniPlayer() {
 // ============================================================
 //  FULL PLAYER
 // ============================================================
-function openFullPlayer()  { fpEl.classList.remove('hidden'); document.body.style.overflow='hidden'; }
-function closeFullPlayer() { fpEl.classList.add('hidden');    document.body.style.overflow=''; }
+function openFullPlayer() {
+    fpEl.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    try { tg?.BackButton?.show(); } catch {}
+}
+function closeFullPlayer() {
+    fpEl.classList.add('hidden');
+    document.body.style.overflow = '';
+    try { tg?.BackButton?.hide(); } catch {}
+}
 
 function setupFullPlayer() {
     $('fp-close').addEventListener('click', closeFullPlayer);
@@ -635,10 +706,23 @@ function setupFullPlayer() {
     fpPrev.addEventListener('click', prevStation);
     fpNext.addEventListener('click', nextStation);
     fpFavBtn.addEventListener('click', () => { if (currentStation) toggleFav(currentStation); });
+    fpMute.addEventListener('click', () => {
+        isMuted = !isMuted;
+        audio.muted  = isMuted;
+        audio.volume = isMuted ? 0 : volume;
+        saveSettings();
+        updateUI();
+        haptic('light');
+    });
     fpVol.addEventListener('input', e => {
         volume = e.target.value / 100;
+        if (volume > 0 && isMuted) isMuted = false;
+        audio.muted  = isMuted;
         audio.volume = isMuted ? 0 : volume;
+        saveSettings();
     });
+    // Аппаратная кнопка «Назад» в Telegram закрывает плеер
+    try { tg?.BackButton?.onClick(closeFullPlayer); } catch {}
     // Swipe down
     let startY = 0;
     fpEl.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, {passive:true});
@@ -654,6 +738,33 @@ function loadFavorites() {
 function saveFavorites() {
     localStorage.setItem('radioFavs_v2', JSON.stringify(favorites));
 }
+
+// ---- Настройки: громкость, mute и последняя станция ----
+function loadSettings() {
+    const v = Number(localStorage.getItem('radioVol_v1'));
+    volume  = (v >= 0 && v <= 1) ? v : 1;
+    isMuted = localStorage.getItem('radioMute_v1') === '1';
+    fpVol.value = Math.round(volume * 100);
+    audio.volume = isMuted ? 0 : volume;
+    audio.muted  = isMuted;
+}
+function saveSettings() {
+    try {
+        localStorage.setItem('radioVol_v1', String(volume));
+        localStorage.setItem('radioMute_v1', isMuted ? '1' : '0');
+    } catch {}
+}
+function saveLastStation(station) {
+    try { localStorage.setItem('radioLast_v1', JSON.stringify(station)); } catch {}
+}
+function restoreLastStation() {
+    let last = null;
+    try { last = JSON.parse(localStorage.getItem('radioLast_v1') || 'null'); } catch {}
+    if (!last?.stationuuid) return;
+    currentStation = last;
+    miniPlayer.classList.remove('hidden');
+    updateUI();
+}
 function toggleFav(station) {
     const i = favorites.findIndex(f => f.stationuuid === station.stationuuid);
     if (i !== -1) {
@@ -664,6 +775,7 @@ function toggleFav(station) {
         notify('Добавлено в избранное ❤️', 'success');
     }
     saveFavorites();
+    haptic('light');
     updateUI();
     if (currentTab === 'fav') {
         showFavorites();
@@ -675,9 +787,7 @@ function toggleFav(station) {
         const isFav = favorites.some(f => f.stationuuid === station.stationuuid);
         const btn = el.querySelector('.si-fav');
         btn.classList.toggle('active', isFav);
-        btn.querySelector('path').setAttribute('d', isFav
-            ? 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
-            : 'M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z');
+        btn.querySelector('path').setAttribute('d', isFav ? ICON_HEART_FILLED : ICON_HEART_OUTLINE);
     });
 }
 
@@ -693,6 +803,11 @@ function notify(msg, type = 'info') {
     notifEl.textContent = msg;
     notifEl.className = 'notif ' + type + ' show';
     notifTimer = setTimeout(() => notifEl.classList.remove('show'), 2800);
+}
+
+// Тактильная отдача в Telegram (если доступна)
+function haptic(style = 'light') {
+    try { tg?.HapticFeedback?.impactOccurred(style); } catch {}
 }
 
 // ============================================================

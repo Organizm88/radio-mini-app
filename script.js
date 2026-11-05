@@ -52,28 +52,32 @@ let loadTimer = null;
 let searchTimer = null;
 let fetchController = null;
 
+let currentTab = 'all'; // 'all', 'fav', 'top'
+
 // ---- Genres ----
 const GENRES = [
-    { label:'Все',         tag:'' },
-    { label:'Поп',         tag:'pop' },
-    { label:'Рок',         tag:'rock' },
-    { label:'Джаз',        tag:'jazz' },
-    { label:'Классика',    tag:'classical' },
-    { label:'Электроника', tag:'electronic' },
-    { label:'Новости',     tag:'news' },
-    { label:'Разговорное', tag:'talk' },
-    { label:'Танцевальная',tag:'dance' },
-    { label:'Хип-хоп',    tag:'hip-hop' },
-    { label:'Метал',       tag:'metal' },
-    { label:'Кантри',      tag:'country' },
-    { label:'Фолк',        tag:'folk' },
-    { label:'R&B',         tag:'rnb' },
-    { label:'Блюз',        tag:'blues' },
-    { label:'Регги',       tag:'reggae' },
-    { label:'Инди',        tag:'indie' },
-    { label:'Амбиент',     tag:'ambient' },
-    { label:'Христианское',tag:'christian' },
-    { label:'Спорт',       tag:'sport' },
+    { label:'🎵 Все жанры',     tag:'' },
+    { label:'🎤 Поп-музыка',    tag:'pop' },
+    { label:'🎸 Рок',           tag:'rock' },
+    { label:'🎷 Джаз',          tag:'jazz' },
+    { label:'🎻 Классика',      tag:'classical' },
+    { label:'💿 Электроника',   tag:'electronic' },
+    { label:'📰 Новости',       tag:'news' },
+    { label:'🎙️ Разговорное',   tag:'talk' },
+    { label:'🪩 Танцевальная',  tag:'dance' },
+    { label:'🎧 Хип-хоп',      tag:'hip-hop' },
+    { label:'⚡ Метал',         tag:'metal' },
+    { label:'🤠 Кантри',        tag:'country' },
+    { label:'🪕 Фолк',          tag:'folk' },
+    { label:'✨ R&B',           tag:'rnb' },
+    { label:'🎺 Блюз',          tag:'blues' },
+    { label:'🌴 Регги',         tag:'reggae' },
+    { label:'🎸 Инди',          tag:'indie' },
+    { label:'🌌 Эмбиент',       tag:'ambient' },
+    { label:'⛪ Христианское',  tag:'christian' },
+    { label:'⚽ Спорт',         tag:'sport' },
+    { label:'🪗 Шансон',        tag:'chanson' },
+    { label:'📻 Ретро',         tag:'retro' }
 ];
 
 // ---- Gradients for fallback ----
@@ -121,7 +125,7 @@ const fpNext      = $('fp-next');
 const fpVol       = $('fp-vol');
 const fpHome      = $('fp-home');
 const listEl      = $('stations-list');
-const genresEl    = $('genres');
+const genreSel    = $('genre-sel');
 const countrySel  = $('country-sel');
 const searchIn    = $('search-input');
 const searchCl    = $('search-clear');
@@ -143,6 +147,7 @@ async function init() {
     setupMiniPlayer();
     setupFullPlayer();
     setupGenres();
+    setupTabs();
     loadMoreBtn.addEventListener('click', () => fetchStations(false));
     $('btn-refresh').addEventListener('click', () => fetchStations(true));
     window.addEventListener('online',  () => notify('Соединение восстановлено','success'));
@@ -191,21 +196,53 @@ async function loadCountries() {
 }
 
 // ============================================================
-//  GENRES
+//  GENRES & TABS
 // ============================================================
 function setupGenres() {
+    genreSel.innerHTML = '';
+    const frag = document.createDocumentFragment();
     GENRES.forEach(g => {
-        const btn = document.createElement('button');
-        btn.className = 'genre-btn' + (g.tag === selectedGenre ? ' active' : '');
-        btn.textContent = g.label;
-        btn.addEventListener('click', () => {
-            selectedGenre = g.tag;
-            document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            fetchStations(true);
-        });
-        genresEl.appendChild(btn);
+        const opt = document.createElement('option');
+        opt.value = g.tag;
+        opt.textContent = g.label;
+        frag.appendChild(opt);
     });
+    genreSel.appendChild(frag);
+
+    genreSel.addEventListener('change', () => {
+        selectedGenre = genreSel.value;
+        if (currentTab === 'fav') switchTab('all');
+        else fetchStations(true);
+    });
+}
+
+function setupTabs() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            switchTab(tab);
+        });
+    });
+}
+
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    if (tab === 'fav') {
+        showFavorites();
+    } else {
+        fetchStations(true);
+    }
+}
+
+function showFavorites() {
+    loadFavorites();
+    stationList = [...favorites];
+    secTitle.textContent = '❤️ Избранное';
+    countBadge.textContent = favorites.length ? `${favorites.length}` : '0';
+    loadMoreWrap.style.display = 'none';
+    renderList(favorites, true);
+    updateStationIdx();
 }
 
 // ============================================================
@@ -233,6 +270,7 @@ function setupSearch() {
 //  FETCH STATIONS
 // ============================================================
 async function fetchStations(reset = false) {
+    if (currentTab === 'fav') return;
     if (isFetching && !reset) return;
     // Cancel previous request if resetting
     if (reset && fetchController) fetchController.abort();
@@ -243,9 +281,13 @@ async function fetchStations(reset = false) {
 
     isFetching = true;
 
+    let order = 'clickcount';
+    if (searchQuery) order = 'name';
+    else if (currentTab === 'top') order = 'votes';
+
     const params = new URLSearchParams({
         hidebroken: 'true',
-        order: searchQuery ? 'name' : 'clickcount',
+        order: order,
         reverse: 'true',
         limit: LIMIT,
         offset
@@ -271,10 +313,11 @@ async function fetchStations(reset = false) {
         // Update section title
         const genre = GENRES.find(g => g.tag === selectedGenre);
         const parts = [];
+        if (currentTab === 'top') parts.push('🔥 Топ 100');
         if (genre && genre.tag) parts.push(genre.label);
         if (selectedCountry) parts.push(flag(selectedCountry) + ' ' + countryName(selectedCountry));
         if (searchQuery) parts.push(`«${searchQuery}»`);
-        secTitle.textContent = parts.join(' · ') || 'Популярные';
+        secTitle.textContent = parts.join(' · ') || (currentTab === 'top' ? '🔥 Топ 100' : 'Популярные');
         countBadge.textContent = stationList.length ? stationList.length + '+' : '';
         $('station-count').textContent = stationList.length ? stationList.length + ' станций' : '';
 
@@ -622,6 +665,10 @@ function toggleFav(station) {
     }
     saveFavorites();
     updateUI();
+    if (currentTab === 'fav') {
+        showFavorites();
+        return;
+    }
     // Update fav buttons in list
     listEl.querySelectorAll('.st-item').forEach(el => {
         if (el.dataset.uuid !== station.stationuuid) return;

@@ -70,19 +70,18 @@ svg{flex-shrink:0}
 /* Filters */
 .filters{padding:0 0 4px}
 .filter-row{display:flex;align-items:center;gap:8px;padding:4px 16px}
-.select-wrap{flex:1;display:flex;align-items:center;background:#1e1e1e;border-radius:8px;padding:8px 12px;gap:8px;overflow:hidden}
+.select-wrap{flex:1;display:flex;align-items:center;background:#1e1e1e;border-radius:8px;padding:8px 10px;gap:6px;overflow:hidden;border:1px solid rgba(255,255,255,.05)}
 .select-ico{width:16px;height:16px;fill:var(--t3);flex-shrink:0}
-.country-sel{flex:1;background:none;border:none;outline:none;color:#fff;font-size:13px;cursor:pointer;min-width:0}
-.country-sel option{background:#1e1e1e;color:#fff}
-.filter-refresh{background:#1e1e1e;border:none;width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .2s}
+.country-sel,.genre-sel{flex:1;background:none;border:none;outline:none;color:#fff;font-size:13px;cursor:pointer;min-width:0;width:100%}
+.country-sel option,.genre-sel option{background:#1e1e1e;color:#fff}
+.filter-refresh{background:#1e1e1e;border:1px solid rgba(255,255,255,.05);width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .2s}
 .filter-refresh:active{background:#2a2a2a}
 .filter-refresh svg{width:18px;height:18px;fill:var(--t2)}
 
-.genres-scroll{display:flex;gap:7px;padding:8px 16px 4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.genres-scroll::-webkit-scrollbar{display:none}
-.genre-btn{background:#1e1e1e;border:none;color:var(--t2);padding:7px 13px;border-radius:16px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
-.genre-btn:active{transform:scale(.95)}
-.genre-btn.active{background:#fff;color:#000}
+.quick-tabs{display:flex;gap:8px;padding:6px 16px 4px}
+.tab-btn{background:#1e1e1e;border:1px solid rgba(255,255,255,.05);color:var(--t2);padding:6px 14px;border-radius:16px;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s}
+.tab-btn:active{transform:scale(.95)}
+.tab-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
 
 /* Section header */
 .section-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px 6px;font-size:16px;font-weight:700}

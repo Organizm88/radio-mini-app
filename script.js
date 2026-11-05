@@ -205,7 +205,8 @@ async function loadCountries() {
 
     countrySel.addEventListener('change', () => {
         selectedCountry = countrySel.value;
-        fetchStations(true);
+        if (currentTab === 'fav') switchTab('all');   // выбор страны не работает во вкладке «Избранное»
+        else fetchStations(true);
     });
 }
 

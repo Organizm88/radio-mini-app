@@ -83,14 +83,16 @@ svg{flex-shrink:0}
 .filter-refresh:active{background:var(--bg4)}
 .filter-refresh svg{width:18px;height:18px;fill:var(--t2)}
 
-.quick-tabs{display:flex;gap:8px;padding:6px 16px 4px}
-.tab-btn{background:var(--bg3);border:1px solid var(--brd);color:var(--t2);padding:6px 14px;border-radius:16px;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s}
+.quick-tabs{display:flex;flex-wrap:wrap;gap:8px;padding:6px 16px 4px}
+.tab-btn{flex-shrink:0;white-space:nowrap;background:var(--bg3);border:1px solid var(--brd);color:var(--t2);padding:6px 14px;border-radius:16px;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s}
 .tab-btn:active{transform:scale(.95)}
 .tab-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
 
 /* Section header */
 .section-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px 6px;font-size:16px;font-weight:700}
 .count-badge{font-size:12px;font-weight:400;color:var(--t3)}
+.clear-recent{margin-left:auto;background:var(--bg3);border:1px solid var(--brd);color:var(--t2);padding:4px 10px;border-radius:12px;font-size:12px;font-weight:500;font-family:inherit;cursor:pointer}
+.clear-recent:active{background:var(--bg4)}
 
 /* ===== STATIONS LIST ===== */
 .stations-list{padding:0 16px}

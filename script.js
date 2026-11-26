@@ -49,6 +49,22 @@ let retryCount = 0;
 let loadTimer = null;
 let searchTimer = null;
 let fetchController = null;
+// Токен попытки: старые таймеры и play() не трогают новую станцию и паузу.
+let playToken = 0;
+let playIntent = false;      // пользователь ждёт старт или уже слушает
+let attemptSettled = false;  // исход этой попытки уже обработан (успех или повтор)
+let mediaBooting = false;    // синхронные error/waiting внутри load()/play()
+let loaderSuppressed = false;
+let stallTimer = null;
+let loaderSafety = null;
+let isBuffering = false;
+
+const PLAY_TIMEOUT_MS = 14000;
+const MAX_RETRIES = 3;
+const RETRY_GAP_MS = 1500;
+const STALL_INLINE_MS = 700;
+const LOADER_SAFETY_MS = 16000;
+const FAIL_TEXT = 'Станция не отвечает. Попробуйте другую';
 
 let currentTab = 'all'; // 'all', 'fav', 'recent', 'top'
 
@@ -115,6 +131,7 @@ const mpInitials  = $('mp-initials');
 const mpEq        = $('mp-eq');
 const mpName      = $('mp-name');
 const mpStatus    = $('mp-status');
+const mpBuffer    = $('mp-buffer');
 const mpPlayBtn   = $('mp-play');
 const fpEl        = $('full-player');
 const fpArt       = $('fp-art');
@@ -510,62 +527,105 @@ function getStreamUrl(station) {
     return toHttps(station.url_resolved || station.url || '');
 }
 
+function attemptAlive(token) {
+    return token === playToken && playIntent && !attemptSettled;
+}
+
 function attemptPlay() {
     if (!currentStation) return;
+    const token = ++playToken;
+    playIntent = true;
+    attemptSettled = false;
+    loaderSuppressed = false;
+    clearBuffering();
     showLoading();
     clearTimeout(loadTimer);
 
     const url = getStreamUrl(currentStation);
-    if (!url) { notify('Нет URL потока','error'); hideLoading(); return; }
+    if (!url) {
+        notify('Нет URL потока', 'error');
+        stopAudio();
+        updateUI();
+        return;
+    }
 
-    audio.src = url;
-    audio.volume = isMuted ? 0 : volume;
-    audio.muted = isMuted;
-    audio.load();
+    let started;
+    mediaBooting = true;
+    try {
+        audio.src = url;
+        audio.volume = isMuted ? 0 : volume;
+        audio.muted = isMuted;
+        audio.load();
+        started = audio.play();
+    } catch (e) {
+        mediaBooting = false;
+        giveUpOrRetry(token);
+        return;
+    }
+    mediaBooting = false;
 
+    // Таймаут не должен запускать повтор, пока первый play() ещё висит:
+    // giveUpOrRetry закрывает попытку, и поздний then/catch её уже не видит.
     loadTimer = setTimeout(() => {
-        if (!isPlaying) {
-            hideLoading();
-            if (retryCount < 3) {
-                retryCount++;
-                notify(`Повтор ${retryCount}/3...`, 'info');
-                setTimeout(attemptPlay, 1500);
-            } else {
-                notify('Станция недоступна', 'error');
-                stopAudio();
-                updateUI();
-            }
-        }
-    }, 14000);
+        if (!attemptAlive(token) || isPlaying) return;
+        giveUpOrRetry(token);
+    }, PLAY_TIMEOUT_MS);
 
-    audio.play().then(() => {
+    if (!started || typeof started.then !== 'function') return;
+    started.then(() => {
+        if (!attemptAlive(token)) return;
+        attemptSettled = true;
         clearTimeout(loadTimer);
         hideLoading();
+        clearBuffering();
         isPlaying = true;
         retryCount = 0;
         updateUI();
         notify('▶ ' + currentStation.name, 'success');
     }).catch(() => {
-        clearTimeout(loadTimer);
-        hideLoading();
-        if (retryCount < 3) {
-            retryCount++;
-            notify(`Повтор ${retryCount}/3...`, 'info');
-            setTimeout(attemptPlay, 1500);
-        } else {
-            notify('Ошибка воспроизведения', 'error');
-            stopAudio();
-            updateUI();
-        }
+        if (!attemptAlive(token)) return;
+        giveUpOrRetry(token);
     });
 }
 
-function stopAudio() {
-    clearTimeout(loadTimer);
-    audio.pause();
-    audio.removeAttribute('src');
-    audio.load();
+function giveUpOrRetry(token) {
+    if (!attemptAlive(token)) return;
+    attemptSettled = true;
     isPlaying = false;
+    clearTimeout(loadTimer);
+    clearBuffering();
+    hideLoading();
+    try { audio.pause(); } catch {}
+
+    if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        notify(`Повтор ${retryCount}/${MAX_RETRIES}...`, 'info');
+        updateUI();
+        loadTimer = setTimeout(() => {
+            if (token !== playToken || !playIntent) return;
+            attemptPlay();
+        }, RETRY_GAP_MS);
+        return;
+    }
+
+    notify(FAIL_TEXT, 'error');
+    stopAudio();
+    updateUI();
+}
+
+function stopAudio() {
+    // Сначала гасим намерение, чтобы waiting/stalled/error от load() не открыли оверлей снова.
+    playToken++;
+    playIntent = false;
+    attemptSettled = true;
+    mediaBooting = false;
+    loaderSuppressed = true;
+    clearTimeout(loadTimer);
+    clearBuffering();
+    isPlaying = false;
+    try { audio.pause(); } catch {}
+    audio.removeAttribute('src');
+    try { audio.load(); } catch {}
     hideLoading();
 }
 
@@ -598,13 +658,105 @@ function updateStationIdx() {
 }
 
 // ---- Audio events (once) ----
+function clearBuffering() {
+    clearTimeout(stallTimer);
+    stallTimer = null;
+    isBuffering = false;
+}
+
+function onPlaying() {
+    // Поздний playing от уже закрытой попытки (повтор или пауза) не возвращает «В эфире».
+    if (!playIntent || (attemptSettled && !isPlaying)) return;
+    clearTimeout(loadTimer);
+    hideLoading();
+    clearBuffering();
+    isPlaying = true;
+    retryCount = 0;
+    updateUI();
+}
+
+function onPause() {
+    if (playIntent) return;
+    clearBuffering();
+    hideLoading();
+    isPlaying = false;
+    updateUI();
+}
+
+function onCanPlay() {
+    const wasBuffering = isBuffering;
+    clearTimeout(stallTimer);
+    stallTimer = null;
+    isBuffering = false;
+    hideLoading();
+    if (wasBuffering) updateUI();
+}
+
+function onStall() {
+    // load() после stopAudio и чужие события не должны снова показывать оверлей.
+    if (!playIntent || mediaBooting) return;
+    if (isPlaying) {
+        if (stallTimer || isBuffering) return;
+        stallTimer = setTimeout(() => {
+            stallTimer = null;
+            if (!playIntent || !isPlaying) return;
+            isBuffering = true;
+            updateUI();
+        }, STALL_INLINE_MS);
+        return;
+    }
+    if (attemptSettled || loaderSuppressed) return;
+    showLoading();
+}
+
+function onAudioError() {
+    if (mediaBooting) return;
+    clearBuffering();
+    if (!playIntent) {
+        hideLoading();
+        return;
+    }
+    if (isPlaying) {
+        isPlaying = false;
+        attemptSettled = false;
+        updateUI();
+        giveUpOrRetry(playToken);
+        return;
+    }
+    if (attemptSettled) {
+        hideLoading();
+        return;
+    }
+    updateUI();
+    giveUpOrRetry(playToken);
+}
+
+function onEnded() {
+    clearTimeout(loadTimer);
+    clearBuffering();
+    hideLoading();
+    isPlaying = false;
+    playIntent = false;
+    attemptSettled = true;
+    updateUI();
+}
+
+function onEmptied() {
+    // emptied также приходит в начале нового load(); тогда оверлей ещё нужен.
+    if (playIntent) return;
+    clearBuffering();
+    hideLoading();
+}
+
 function setupAudio() {
-    audio.addEventListener('playing', () => { isPlaying = true; hideLoading(); updateUI(); });
-    audio.addEventListener('pause',   () => { isPlaying = false; updateUI(); });
-    audio.addEventListener('waiting', showLoading);
-    audio.addEventListener('canplay', hideLoading);
-    audio.addEventListener('stalled', showLoading);
-    audio.addEventListener('error',   () => { hideLoading(); isPlaying = false; updateUI(); });
+    audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('waiting', onStall);
+    audio.addEventListener('stalled', onStall);
+    audio.addEventListener('canplay', onCanPlay);
+    audio.addEventListener('error', onAudioError);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('emptied', onEmptied);
     setupMediaSession();
 }
 
@@ -647,7 +799,9 @@ function updateUI() {
 
     // --- mini player ---
     mpName.textContent    = s ? s.name : 'Выберите станцию';
-    mpStatus.textContent  = s ? (isPlaying ? 'В эфире' : 'Пауза') : '';
+    mpStatus.textContent  = s ? (isPlaying ? (isBuffering ? 'Буферизация…' : 'В эфире') : 'Пауза') : '';
+    mpBuffer.classList.toggle('hidden', !isBuffering);
+    miniPlayer.classList.toggle('buffering', isBuffering);
     mpArt.style.background = g;
     mpInitials.textContent = ini;
     miniPlayer.classList.toggle('playing', isPlaying);
@@ -885,8 +1039,24 @@ function toggleFav(station) {
 // ============================================================
 //  UTILS
 // ============================================================
-function showLoading() { loadingEl.classList.remove('hidden'); }
-function hideLoading() { loadingEl.classList.add('hidden'); }
+function showLoading() {
+    const token = playToken;
+    const wasHidden = loadingEl.classList.contains('hidden');
+    loadingEl.classList.remove('hidden');
+    // Повторные waiting не продлевают страховку: оверлей не может висеть дольше лимита.
+    if (!wasHidden) return;
+    clearTimeout(loaderSafety);
+    loaderSafety = setTimeout(() => {
+        if (token !== playToken) return;
+        loaderSuppressed = true;
+        hideLoading();
+    }, LOADER_SAFETY_MS);
+}
+function hideLoading() {
+    clearTimeout(loaderSafety);
+    loaderSafety = null;
+    loadingEl.classList.add('hidden');
+}
 
 let notifTimer = null;
 function notify(msg, type = 'info') {

@@ -35,6 +35,7 @@ let isPlaying = false;
 let isMuted = false;
 let volume = 1;
 let favorites = [];
+let recent = [];
 let stationList = [];
 let stationIdx = -1;
 let selectedCountry = '';
@@ -49,7 +50,7 @@ let loadTimer = null;
 let searchTimer = null;
 let fetchController = null;
 
-let currentTab = 'all'; // 'all', 'fav', 'top'
+let currentTab = 'all'; // 'all', 'fav', 'recent', 'top'
 
 // ---- Genres ----
 const GENRES = [
@@ -141,6 +142,7 @@ const loadingEl   = $('loading');
 const notifEl     = $('notif');
 const loadMoreWrap = $('load-more-wrap');
 const loadMoreBtn  = $('load-more-btn');
+const clearRecentBtn = $('clear-recent');
 
 // ============================================================
 //  INIT
@@ -148,6 +150,7 @@ const loadMoreBtn  = $('load-more-btn');
 async function init() {
     applyTgTheme();
     loadFavorites();
+    loadRecent();
     loadSettings();
     setupAudio();
     setupSearch();
@@ -157,6 +160,7 @@ async function init() {
     setupTabs();
     loadMoreBtn.addEventListener('click', () => fetchStations(false));
     $('btn-refresh').addEventListener('click', () => fetchStations(true));
+    clearRecentBtn.addEventListener('click', clearRecent);
     window.addEventListener('online',  () => notify('Соединение восстановлено','success'));
     window.addEventListener('offline', () => notify('Нет интернет-соединения','error'));
     // Load countries async (don't block)
@@ -205,7 +209,7 @@ async function loadCountries() {
 
     countrySel.addEventListener('change', () => {
         selectedCountry = countrySel.value;
-        if (currentTab === 'fav') switchTab('all');   // выбор страны не работает во вкладке «Избранное»
+        if (isLibraryTab()) switchTab('all');   // страна не фильтрует «Избранное» и «Недавно»
         else fetchStations(true);
     });
 }
@@ -226,7 +230,7 @@ function setupGenres() {
 
     genreSel.addEventListener('change', () => {
         selectedGenre = genreSel.value;
-        if (currentTab === 'fav') switchTab('all');
+        if (isLibraryTab()) switchTab('all');
         else fetchStations(true);
     });
 }
@@ -240,14 +244,17 @@ function setupTabs() {
     });
 }
 
+function isLibraryTab() {
+    return currentTab === 'fav' || currentTab === 'recent';
+}
+
 function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-    if (tab === 'fav') {
-        showFavorites();
-    } else {
-        fetchStations(true);
-    }
+    if (tab !== 'recent') clearRecentBtn.classList.add('hidden');
+    if (tab === 'fav') showFavorites();
+    else if (tab === 'recent') showRecent();
+    else fetchStations(true);
 }
 
 function showFavorites() {
@@ -257,11 +264,28 @@ function showFavorites() {
     countBadge.textContent = favorites.length ? `${favorites.length}` : '0';
     $('station-count').textContent = favorites.length ? favorites.length + ' станций' : '';
     loadMoreWrap.style.display = 'none';
+    clearRecentBtn.classList.add('hidden');
     if (!favorites.length) {
         listEl.innerHTML = '<div class="no-results">Пока нет избранных станций.<br>Нажмите ❤️ у любой станции, чтобы добавить её сюда.</div>';
         return;
     }
     renderList(favorites, true);
+    updateStationIdx();
+}
+
+function showRecent() {
+    loadRecent();
+    stationList = [...recent];
+    secTitle.textContent = 'Недавно играли';
+    countBadge.textContent = recent.length ? `${recent.length}` : '0';
+    $('station-count').textContent = recent.length ? recent.length + ' станций' : '';
+    loadMoreWrap.style.display = 'none';
+    clearRecentBtn.classList.toggle('hidden', !recent.length);
+    if (!recent.length) {
+        listEl.innerHTML = '<div class="no-results">Вы пока ничего не слушали</div>';
+        return;
+    }
+    renderList(stationList, true);
     updateStationIdx();
 }
 
@@ -275,7 +299,7 @@ function setupSearch() {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => {
             searchQuery = q;
-            if (currentTab === 'fav') switchTab('all');   // поиск не работает во вкладке «Избранное»
+            if (isLibraryTab()) switchTab('all');   // поиск не фильтрует «Избранное» и «Недавно»
             else fetchStations(true);
         }, 400);
     });
@@ -284,6 +308,7 @@ function setupSearch() {
         searchCl.classList.add('hidden');
         searchQuery = '';
         if (currentTab === 'fav') showFavorites();
+        else if (currentTab === 'recent') showRecent();
         else fetchStations(true);
     });
 }
@@ -292,7 +317,7 @@ function setupSearch() {
 //  FETCH STATIONS
 // ============================================================
 async function fetchStations(reset = false) {
-    if (currentTab === 'fav') return;
+    if (isLibraryTab()) return;
     if (isFetching && !reset) return;
     // Cancel previous request if resetting
     if (reset && fetchController) fetchController.abort();
@@ -320,6 +345,8 @@ async function fetchStations(reset = false) {
 
     try {
         const data = await apiFetch('/stations/search?' + params, fetchController.signal);
+        // Пока ждали ответ, могли открыть «Избранное» или «Недавно»
+        if (isLibraryTab()) return;
 
         if (data.length < LIMIT) hasMore = false;
         offset += data.length;
@@ -453,7 +480,7 @@ function escHtml(s) {
 // ============================================================
 //  PLAYBACK
 // ============================================================
-function playStation(station) {
+function playStation(station, opts) {
     if (!navigator.onLine) { notify('Нет интернет-соединения','error'); return; }
     if (!station) return;
 
@@ -463,7 +490,11 @@ function playStation(station) {
     stopAudio();
     retryCount = 0;
     currentStation = station;
-    updateStationIdx();
+    recordRecent(station);
+    // «След./пред.» не перестраивают список: станция уехала бы наверх и
+    // следующая вернула бы назад. Тап по карточке обновляет порядок.
+    if (currentTab === 'recent' && !opts?.keepOrder) showRecent();
+    else updateStationIdx();
     miniPlayer.classList.remove('hidden');
     updateUI();
     attemptPlay();
@@ -553,12 +584,12 @@ function togglePlay() {
 function prevStation() {
     if (!stationList.length) return;
     stationIdx = (stationIdx - 1 + stationList.length) % stationList.length;
-    playStation(stationList[stationIdx]);
+    playStation(stationList[stationIdx], { keepOrder: true });
 }
 function nextStation() {
     if (!stationList.length) return;
     stationIdx = (stationIdx + 1) % stationList.length;
-    playStation(stationList[stationIdx]);
+    playStation(stationList[stationIdx], { keepOrder: true });
 }
 function updateStationIdx() {
     if (!currentStation || !stationList.length) return;
@@ -755,6 +786,65 @@ function saveSettings() {
         localStorage.setItem('radioMute_v1', isMuted ? '1' : '0');
     } catch {}
 }
+const RECENT_KEY = 'radioRecent_v1';
+const RECENT_LIMIT = 30;
+
+function toRecentEntry(station, playedAt) {
+    if (!station || !station.stationuuid) return null;
+    const bitrate = Number(station.bitrate);
+    const ts = playedAt == null ? Date.now() : Number(playedAt);
+    return {
+        stationuuid: String(station.stationuuid),
+        name: station.name || '',
+        url_resolved: station.url_resolved || '',
+        url: station.url || '',
+        favicon: station.favicon || '',
+        country: station.country || '',
+        countrycode: station.countrycode || '',
+        tags: station.tags || '',
+        codec: station.codec || '',
+        bitrate: Number.isFinite(bitrate) ? bitrate : 0,
+        playedAt: Number.isFinite(ts) ? ts : Date.now()
+    };
+}
+
+function loadRecent() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+        const list = Array.isArray(raw) ? raw : [];
+        const seen = new Set();
+        recent = [];
+        for (const item of list) {
+            const entry = toRecentEntry(item, item && item.playedAt);
+            if (!entry || seen.has(entry.stationuuid)) continue;
+            seen.add(entry.stationuuid);
+            recent.push(entry);
+            if (recent.length >= RECENT_LIMIT) break;
+        }
+    } catch {
+        recent = [];
+    }
+}
+
+function saveRecent() {
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch {}
+}
+
+function recordRecent(station) {
+    const entry = toRecentEntry(station);
+    if (!entry) return;
+    recent = [entry, ...recent.filter(s => s.stationuuid !== entry.stationuuid)].slice(0, RECENT_LIMIT);
+    saveRecent();
+}
+
+function clearRecent() {
+    recent = [];
+    saveRecent();
+    haptic('light');
+    notify('История очищена', 'info');
+    if (currentTab === 'recent') showRecent();
+}
+
 function saveLastStation(station) {
     try { localStorage.setItem('radioLast_v1', JSON.stringify(station)); } catch {}
 }
